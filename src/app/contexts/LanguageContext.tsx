@@ -5,7 +5,7 @@ export type Language = 'en' | 'ru' | 'lv';
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -191,6 +191,30 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.russianDesc': 'Russian language',
     'settings.latvian': 'Latviešu',
     'settings.latvianDesc': 'Latvian language',
+
+    // Login Modal
+    'login.title': 'AUTHORIZATION REQUIRED',
+    'login.subtitle': 'Sign in to unlock all features',
+    'login.username': 'Username/Phone',
+    'login.password': 'Password',
+    'login.usernamePlaceholder': 'Enter your username',
+    'login.passwordPlaceholder': 'Enter your password',
+    'login.signIn': 'SIGN IN',
+    'login.signingIn': 'SIGNING IN...',
+    'login.benefits': 'With authorization you can:',
+    'login.benefit1': 'Open cases and win amazing prizes',
+    'login.benefit2': 'Claim items to your Steam inventory',
+    'login.benefit3': 'Track your winnings and statistics',
+    'login.benefit4': 'Participate in exclusive promotions',
+    'login.benefit5': 'Compete with other players',
+    'login.note': 'Use your club profile credentials to sign in',
+    'login.needAuth': 'Please sign in to {action}',
+    'login.actionOpen': 'open cases',
+    'login.actionClaim': 'claim items',
+    'login.actionDeposit': 'deposit funds',
+    'login.fillAllFields': 'Please fill in all fields',
+    'login.loginSuccess': 'Login successful!',
+    'login.loginFailed': 'Login failed. Please check your credentials.',
   },
 
   ru: {
@@ -373,6 +397,30 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.russianDesc': 'Русский язык',
     'settings.latvian': 'Latviešu',
     'settings.latvianDesc': 'Латышский язык',
+
+    // Login Modal
+    'login.title': 'ТРЕБУЕТСЯ АВТОРИЗАЦИЯ',
+    'login.subtitle': 'Войдите, чтобы разблокировать все функции',
+    'login.username': 'Имя пользователя/Телефон',
+    'login.password': 'Пароль',
+    'login.usernamePlaceholder': 'Введите имя пользователя',
+    'login.passwordPlaceholder': 'Введите пароль',
+    'login.signIn': 'ВОЙТИ',
+    'login.signingIn': 'ВХОД...',
+    'login.benefits': 'С авторизацией вы можете:',
+    'login.benefit1': 'Открывать кейсы и выигрывать призы',
+    'login.benefit2': 'Получать предметы в инвентарь Steam',
+    'login.benefit3': 'Отслеживать выигрыши и статистику',
+    'login.benefit4': 'Участвовать в эксклюзивных акциях',
+    'login.benefit5': 'Соревноваться с другими игроками',
+    'login.note': 'Используйте учетные данные профиля клуба для входа',
+    'login.needAuth': 'Войдите, чтобы {action}',
+    'login.actionOpen': 'открывать кейсы',
+    'login.actionClaim': 'получать предметы',
+    'login.actionDeposit': 'пополнять баланс',
+    'login.fillAllFields': 'Пожалуйста, заполните все поля',
+    'login.loginSuccess': 'Вход успешен!',
+    'login.loginFailed': 'Вход не удался. Проверьте свои учетные данные.',
   },
 
   lv: {
@@ -555,6 +603,30 @@ const translations: Record<Language, Record<string, string>> = {
     'settings.russianDesc': 'Krievu valoda',
     'settings.latvian': 'Latviešu',
     'settings.latvianDesc': 'Latviešu valoda',
+
+    // Login Modal
+    'login.title': 'NEPIECIEŠAMA AUTORIZĀCIJA',
+    'login.subtitle': 'Piesakieties, lai atbloķētu visas funkcijas',
+    'login.username': 'Lietotājvārds/Telefons',
+    'login.password': 'Parole',
+    'login.usernamePlaceholder': 'Ievadiet lietotājvārdu',
+    'login.passwordPlaceholder': 'Ievadiet paroli',
+    'login.signIn': 'PIETEIKTIES',
+    'login.signingIn': 'PIESAKĀS...',
+    'login.benefits': 'Ar autorizāciju jūs varat:',
+    'login.benefit1': 'Atvērt kastes un laimēt balvas',
+    'login.benefit2': 'Saņemt priekšmetus Steam inventārā',
+    'login.benefit3': 'Sekot līdzi laimestiem un statistikai',
+    'login.benefit4': 'Piedalīties ekskluzīvās akcijās',
+    'login.benefit5': 'Sacensties ar citiem spēlētājiem',
+    'login.note': 'Izmantojiet savu kluba profila akreditācijas datus, lai piesakieties',
+    'login.needAuth': 'Lūdzu, piesakieties, lai {action}',
+    'login.actionOpen': 'atvērtu kastes',
+    'login.actionClaim': 'saņemtu priekšmetus',
+    'login.actionDeposit': 'papildinātu bilanci',
+    'login.fillAllFields': 'Lūdzu, aizpildiet visus laukus',
+    'login.loginSuccess': 'Pieteikšanās veiksmīga!',
+    'login.loginFailed': 'Pieteikšanās neveiksmīga. Lūdzu, pārbaudiet savus akreditācijas dati.',
   },
 };
 

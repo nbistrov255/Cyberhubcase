@@ -182,9 +182,10 @@ const tierColors = {
 
 interface CasesPageProps {
   onCaseClick: (caseData: CaseData) => void;
+  isAuthenticated: boolean;
 }
 
-export function CasesPage({ onCaseClick }: CasesPageProps) {
+export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
   const [hoveredCase, setHoveredCase] = useState<string | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [showTermsRules, setShowTermsRules] = useState(false);
@@ -221,14 +222,19 @@ export function CasesPage({ onCaseClick }: CasesPageProps) {
   }, []);
 
   const handleCaseClick = (caseData: CaseData) => {
-    if (caseData.usedToday) return;
+    // Блокируем клик только для авторизованных пользователей, которые уже использовали кейс
+    if (isAuthenticated && caseData.usedToday) return;
     onCaseClick(caseData);
   };
 
   const renderCaseCard = (caseData: CaseData) => {
     const isHovered = hoveredCase === caseData.id;
-    const isReady = caseData.deposited >= caseData.required && !caseData.usedToday;
-    const isLocked = caseData.deposited < caseData.required && !caseData.usedToday;
+    // Для гостей всегда показываем deposited = 0
+    const displayedDeposited = isAuthenticated ? caseData.deposited : 0;
+    // Для гостей usedToday не имеет значения
+    const effectiveUsedToday = isAuthenticated && caseData.usedToday;
+    const isReady = displayedDeposited >= caseData.required && !effectiveUsedToday;
+    const isLocked = displayedDeposited < caseData.required && !effectiveUsedToday;
 
     return (
       <motion.button
@@ -267,24 +273,8 @@ export function CasesPage({ onCaseClick }: CasesPageProps) {
             }}
           />
 
-          {/* READY Badge - Top Right - For unlocked cases */}
-          {isReady && !isHovered && (
-            <div className="absolute top-3 right-3 z-20">
-              <div
-                className="px-2 py-1.5 font-bold text-xs text-white"
-                style={{
-                  background: 'linear-gradient(135deg, #10b981, #34d399)',
-                  borderRadius: '6px',
-                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.4), 0 0 20px rgba(16, 185, 129, 0.3)',
-                }}
-              >
-                READY
-              </div>
-            </div>
-          )}
-          
-          {/* Deposit Progress Badge - Top Right - For locked cases */}
-          {isLocked && !caseData.usedToday && !isHovered && (
+          {/* Deposit Progress Badge - Top Right - Всегда показываем */}
+          {!caseData.usedToday && (
             <div className="absolute top-3 right-3 z-20">
               {/* Deposit Badge with Progress Ring Inside */}
               <div
@@ -316,7 +306,7 @@ export function CasesPage({ onCaseClick }: CasesPageProps) {
                       fill="none"
                       strokeLinecap="round"
                       strokeDasharray={`${2 * Math.PI * 7}`}
-                      strokeDashoffset={2 * Math.PI * 7 * (1 - caseData.deposited / caseData.required)}
+                      strokeDashoffset={2 * Math.PI * 7 * (1 - displayedDeposited / caseData.required)}
                     />
                     <defs>
                       <linearGradient id="miniOrangeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -328,13 +318,13 @@ export function CasesPage({ onCaseClick }: CasesPageProps) {
                 </div>
                 
                 {/* Deposit Text */}
-                <span>{caseData.deposited} / {caseData.required}€</span>
+                <span>{displayedDeposited} / {caseData.required}€</span>
               </div>
             </div>
           )}
           
-          {/* Used Badge */}
-          {caseData.usedToday && (
+          {/* Used Badge - только для авторизованных */}
+          {isAuthenticated && caseData.usedToday && (
             <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex flex-col items-center justify-center z-20">
               <div className="flex flex-col items-center gap-3">
                 {/* Top Text */}
@@ -351,6 +341,31 @@ export function CasesPage({ onCaseClick }: CasesPageProps) {
                     filter: 'brightness(0) invert(1) drop-shadow(0 4px 12px rgba(255, 255, 255, 0.6))'
                   }}
                 />
+                
+                {/* Deposit Badge - показываем сколько внесено */}
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 backdrop-blur-sm border border-white/20">
+                  <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                    <circle cx="9" cy="9" r="7" stroke="rgba(255, 255, 255, 0.3)" strokeWidth="1.5" fill="none" />
+                    <circle
+                      cx="9"
+                      cy="9"
+                      r="7"
+                      stroke="url(#usedMiniGradient)"
+                      strokeWidth="1.5"
+                      fill="none"
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 7}`}
+                      strokeDashoffset={2 * Math.PI * 7 * (1 - displayedDeposited / caseData.required)}
+                    />
+                    <defs>
+                      <linearGradient id="usedMiniGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style={{ stopColor: '#ffcb77', stopOpacity: 1 }} />
+                        <stop offset="100%" style={{ stopColor: '#ffa726', stopOpacity: 1 }} />
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  <span className="text-sm font-bold text-white">{displayedDeposited} / {caseData.required}€</span>
+                </div>
                 
                 {/* Bottom Text */}
                 <span className="text-gray-300 text-xs">
@@ -408,7 +423,7 @@ export function CasesPage({ onCaseClick }: CasesPageProps) {
                         strokeDashoffset: 2 * Math.PI * 50
                       }}
                       animate={{
-                        strokeDashoffset: 2 * Math.PI * 50 * (1 - caseData.deposited / caseData.required)
+                        strokeDashoffset: 2 * Math.PI * 50 * (1 - displayedDeposited / caseData.required)
                       }}
                       transition={{
                         duration: 1.2,
@@ -435,7 +450,7 @@ export function CasesPage({ onCaseClick }: CasesPageProps) {
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.3, duration: 0.5 }}
                       >
-                        {caseData.deposited}
+                        {displayedDeposited}
                       </motion.div>
                       
                       {/* Divider Line */}
@@ -481,7 +496,7 @@ export function CasesPage({ onCaseClick }: CasesPageProps) {
                   transition={{ delay: 0.6, duration: 0.5 }}
                 >
                   <div className="text-lg font-bold text-[#ffcb77] font-mono" style={{ textShadow: '0 0 12px rgba(255, 203, 119, 0.6)' }}>
-                    €{(caseData.required - caseData.deposited).toFixed(2)}
+                    €{(caseData.required - displayedDeposited).toFixed(2)}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">
                     to unlock this case

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { TopBar } from './components/TopBar';
 import { CasesPage } from './components/CasesPage';
 import { CaseOpening } from './components/CaseOpening';
@@ -9,6 +10,8 @@ import { PlayerProfile } from './components/PlayerProfile';
 import { SettingsModal } from './components/SettingsModal';
 import { CaseContentPage } from './components/CaseContentPage';
 import { CaseOpenPage } from './components/CaseOpenPage';
+import { LoginModal } from './components/LoginModal';
+import { toast, Toaster } from 'sonner';
 
 export type Page = 'cases' | 'opening' | 'win' | 'inventory' | 'profile-public' | 'profile-private' | 'case-content' | 'case-open';
 
@@ -35,10 +38,10 @@ export interface LiveFeedItem {
 }
 
 function ClientAppContent() {
-  const { language, setLanguage } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
+  const { isAuthenticated, profile, refreshProfile, isLoading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('cases');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [balance, setBalance] = useState(5.05);
   const [selectedCase, setSelectedCase] = useState<any>(null);
   const [wonItem, setWonItem] = useState<InventoryItem | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([
@@ -69,8 +72,13 @@ function ClientAppContent() {
     },
   ]);
   const [selectedProfilePlayer, setSelectedProfilePlayer] = useState<string | null>(null);
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+  
+  // Получаем баланс из профиля
+  const balance = profile?.dailySum || 0;
 
   const handleCaseClick = (caseData: any) => {
+    // Гость может просмотреть страницу кейса, но передаем флаг авторизации
     setSelectedCase(caseData);
     setCurrentPage('case-open');
   };
@@ -126,44 +134,41 @@ function ClientAppContent() {
   };
 
   const handleBalanceRefresh = async () => {
-    try {
-      const response = await fetch('http://localhost:3000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ pc_name: 'PC03' }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to refresh balance');
-      }
-
-      const data = await response.json();
-      
-      // Обновляем баланс из поля dailySum
-      if (data.dailySum !== undefined) {
-        setBalance(data.dailySum);
-        console.log('Balance updated:', data.dailySum);
-      }
-    } catch (error) {
-      console.error('Error refreshing balance:', error);
-    }
+    // Используем метод refresh из AuthContext
+    await refreshProfile();
+    toast.success(t('login.loginSuccess') || 'Profile refreshed!');
   };
+
+  // Показываем индикатор загрузки при инициализации
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#17171c] text-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#7c2d3a]"></div>
+          <p className="mt-4 text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#17171c] text-white">
       <TopBar
         balance={balance}
+        isAuthenticated={isAuthenticated}
         onSettingsClick={() => setSettingsOpen(true)}
         onProfileClick={() => setCurrentPage('profile-private')}
-        onLiveFeedClick={handleLiveFeedClick}
-        onLogoClick={handleLogoClick}
+        onLoginClick={() => setLoginModalOpen(true)}
+        onLiveFeedClick={(playerName) => {
+          setSelectedProfilePlayer(playerName);
+          setCurrentPage('profile-public');
+        }}
+        onLogoClick={() => setCurrentPage('cases')}
         onBalanceRefresh={handleBalanceRefresh}
       />
 
       <div className="pt-48">
-        {currentPage === 'cases' && <CasesPage onCaseClick={handleCaseClick} />}
+        {currentPage === 'cases' && <CasesPage onCaseClick={handleCaseClick} isAuthenticated={isAuthenticated} />}
         {currentPage === 'win' && wonItem && (
           <WinPage
             item={wonItem}
@@ -204,9 +209,14 @@ function ClientAppContent() {
             caseImage={selectedCase.image}
             deposited={selectedCase.deposited}
             required={selectedCase.required}
+            isAuthenticated={isAuthenticated}
             onBack={() => setCurrentPage('cases')}
             onClose={() => setCurrentPage('cases')}
             onWin={handleCaseWin}
+            onRequestLogin={() => {
+              setLoginModalOpen(true);
+              toast.warning(t('login.needAuth').replace('{action}', t('login.actionOpen')));
+            }}
           />
         )}
       </div>
@@ -217,6 +227,22 @@ function ClientAppContent() {
         currentLanguage={language}
         onSave={handleSaveSettings}
       />
+
+      <LoginModal
+        isOpen={loginModalOpen}
+        onClose={() => setLoginModalOpen(false)}
+      />
+
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          style: {
+            background: '#1d1d22',
+            border: '1px solid #2a2a30',
+            color: '#fff',
+          },
+        }}
+      />
     </div>
   );
 }
@@ -224,7 +250,9 @@ function ClientAppContent() {
 export default function ClientApp() {
   return (
     <LanguageProvider>
-      <ClientAppContent />
+      <AuthProvider>
+        <ClientAppContent />
+      </AuthProvider>
     </LanguageProvider>
   );
 }

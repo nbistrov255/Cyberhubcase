@@ -8,8 +8,10 @@ const knifeImage = "https://i.ibb.co/cXCCBcfV/unnamed.png";
 
 interface TopBarProps {
   balance: number;
+  isAuthenticated: boolean;
   onSettingsClick: () => void;
   onProfileClick: () => void;
+  onLoginClick: () => void;
   onLiveFeedClick: (playerName: string) => void;
   onLogoClick?: () => void; // Добавили функцию для клика по логотипу
   onBalanceRefresh?: () => void; // Добавили функцию для обновления баланса
@@ -236,8 +238,10 @@ const getRarityIcon = (rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythi
 
 export function TopBar({
   balance,
+  isAuthenticated,
   onSettingsClick,
   onProfileClick,
+  onLoginClick,
   onLiveFeedClick,
   onLogoClick,
   onBalanceRefresh,
@@ -312,7 +316,8 @@ export function TopBar({
 
           {/* Right Side */}
           <div className="flex items-center gap-4">
-            {/* Balance - KeyDrop Style */}
+            {/* Balance - KeyDrop Style - только для авторизованных */}
+            {isAuthenticated && (
             <div className="flex items-center bg-[#3d5a2f] rounded-sm overflow-hidden border border-[#4a6738]/60 h-10">
               {/* Left Icon Zone - Slightly Lighter Green Square */}
               <div className="h-10 w-10 flex items-center justify-center bg-[#4a6738]">
@@ -340,6 +345,7 @@ export function TopBar({
                 />
               </button>
             </div>
+            )}
 
             {/* Settings */}
             <button
@@ -349,23 +355,37 @@ export function TopBar({
               <Settings className="w-5 h-5 transition-transform duration-200 group-hover:rotate-90" />
             </button>
 
-            {/* Profile Avatar with Level */}
-            <button
-              onClick={onProfileClick}
-              className="w-10 h-10 rounded-lg overflow-hidden relative hover:ring-2 hover:ring-white/20 transition-all"
-            >
-              {/* Avatar Image */}
-              <img
-                src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop"
-                alt="Player Avatar"
-                className="w-full h-full object-cover"
-              />
-              
-              {/* Level Bar - Bottom */}
-              <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-sm flex items-center justify-center" style={{ height: '14px' }}>
-                <span className="text-[9px] font-bold text-white/90 tracking-wide">LVL 44</span>
-              </div>
-            </button>
+            {/* Login Button or Profile Avatar */}
+            {!isAuthenticated ? (
+              // Кнопка авторизации для гостя
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={onLoginClick}
+                className="px-4 h-10 rounded-lg bg-gradient-to-r from-[#7c2d3a] to-[#9a3b4a] hover:from-[#9a3b4a] hover:to-[#7c2d3a] flex items-center gap-2 transition-all duration-300 font-bold uppercase text-sm tracking-wider"
+              >
+                <User className="w-5 h-5" />
+                <span>Sign In</span>
+              </motion.button>
+            ) : (
+              // Profile Avatar with Level для авторизованных
+              <button
+                onClick={onProfileClick}
+                className="w-10 h-10 rounded-lg overflow-hidden relative hover:ring-2 hover:ring-white/20 transition-all"
+              >
+                {/* Avatar Image */}
+                <img
+                  src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop"
+                  alt="Player Avatar"
+                  className="w-full h-full object-cover"
+                />
+                
+                {/* Level Bar - Bottom */}
+                <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-sm flex items-center justify-center" style={{ height: '14px' }}>
+                  <span className="text-[9px] font-bold text-white/90 tracking-wide">LVL 44</span>
+                </div>
+              </button>
+            )}
           </div>
         </div>
         

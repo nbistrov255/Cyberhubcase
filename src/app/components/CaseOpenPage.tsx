@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Volume2, VolumeX, X, Gift, Crown, Flame, Diamond, Star, Sparkles } from 'lucide-react';
+import { ArrowLeft, Volume2, VolumeX, X, Gift, Crown, Flame, Diamond, Star, Sparkles, Lock } from 'lucide-react';
 import { FooterSection } from './FooterSection';
+import { useLanguage } from '../contexts/LanguageContext';
 
 interface CaseItem {
   id: string;
@@ -17,9 +18,11 @@ interface CaseOpenPageProps {
   caseImage: string;
   deposited: number;
   required: number;
+  isAuthenticated: boolean;
   onBack: () => void;
   onClose: () => void;
   onWin: (item: CaseItem) => void;
+  onRequestLogin: () => void;
 }
 
 const rarityColors = {
@@ -56,15 +59,17 @@ const mockCaseContents: CaseItem[] = [
   { id: '14', name: 'Pole Position', type: 'CZ75-Auto', image: 'https://i.ibb.co/cXCCBcfV/unnamed.png', rarity: 'Common', chance: 15.64 },
 ];
 
-export function CaseOpenPage({ caseName, caseImage, deposited, required, onBack, onClose, onWin }: CaseOpenPageProps) {
+export function CaseOpenPage({ caseName, caseImage, deposited, required, isAuthenticated, onBack, onClose, onWin, onRequestLogin }: CaseOpenPageProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rouletteItems, setRouletteItems] = useState<CaseItem[]>([]);
   const [offset, setOffset] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const canOpen = deposited >= required;
-  const missingAmount = required - deposited;
+  // Для гостей всегда показываем deposited = 0
+  const displayedDeposited = isAuthenticated ? deposited : 0;
+  const canOpen = displayedDeposited >= required;
+  const missingAmount = required - displayedDeposited;
 
   // Rarity order for sorting (best to worst)
   const rarityOrder = {
@@ -150,6 +155,8 @@ export function CaseOpenPage({ caseName, caseImage, deposited, required, onBack,
       alert('Failed to open case. Please try again.');
     }
   };
+
+  const { t } = useLanguage();
 
   return (
     <div className="min-h-screen bg-[#17171c] pb-12">
@@ -347,21 +354,41 @@ export function CaseOpenPage({ caseName, caseImage, deposited, required, onBack,
 
           {/* Open Button - Below Roulette */}
           <div className="mt-6 flex justify-center">
-            <motion.button
-              whileHover={canOpen && !isSpinning ? { scale: 1.02 } : {}}
-              whileTap={canOpen && !isSpinning ? { scale: 0.98 } : {}}
-              onClick={handleOpen}
-              disabled={!canOpen || isSpinning}
-              className="px-20 py-4 rounded-lg font-bold text-lg uppercase transition-all font-[Aldrich]"
-              style={{
-                backgroundColor: 'transparent',
-                border: canOpen && !isSpinning ? '2px solid #10b981' : '2px solid #ef4444',
-                color: canOpen && !isSpinning ? '#10b981' : '#ef4444',
-                cursor: canOpen && !isSpinning ? 'pointer' : 'not-allowed',
-              }}
-            >
-              {isSpinning ? 'OPENING...' : canOpen ? 'OPEN CASE' : `ADD ${missingAmount.toFixed(2)} $ TO OPEN`}
-            </motion.button>
+            {!isAuthenticated ? (
+              // Кнопка для неавторизованных
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={onRequestLogin}
+                className="px-20 py-4 rounded-lg font-bold text-lg uppercase transition-all font-[Aldrich] flex items-center gap-3"
+                style={{
+                  backgroundColor: 'transparent',
+                  border: '2px solid #7c2d3a',
+                  color: '#7c2d3a',
+                  cursor: 'pointer',
+                }}
+              >
+                <Lock className="w-5 h-5" />
+                {t('login.signIn').toUpperCase()}
+              </motion.button>
+            ) : (
+              // Кнопка для авторизованных
+              <motion.button
+                whileHover={canOpen && !isSpinning ? { scale: 1.02 } : {}}
+                whileTap={canOpen && !isSpinning ? { scale: 0.98 } : {}}
+                onClick={handleOpen}
+                disabled={!canOpen || isSpinning}
+                className="px-20 py-4 rounded-lg font-bold text-lg uppercase transition-all font-[Aldrich]"
+                style={{
+                  backgroundColor: 'transparent',
+                  border: canOpen && !isSpinning ? '2px solid #10b981' : '2px solid #ef4444',
+                  color: canOpen && !isSpinning ? '#10b981' : '#ef4444',
+                  cursor: canOpen && !isSpinning ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {isSpinning ? t('caseOpen.opening') : canOpen ? t('caseOpen.openCase') : `ADD ${missingAmount.toFixed(2)} $ TO OPEN`}
+              </motion.button>
+            )}
           </div>
         </div>
       </div>
