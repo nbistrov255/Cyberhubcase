@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Search, Edit, Trash2, Eye } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
@@ -28,46 +28,34 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
   const [filterType, setFilterType] = useState<'all' | 'physical' | 'balance' | 'virtual'>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [items, setItems] = useState<Item[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data
-  const [items, setItems] = useState<Item[]>([
-    {
-      id: '1',
-      nameLv: 'Gaming Austiņas Pro',
-      nameRu: 'Игровые наушники Pro',
-      nameEn: 'Gaming Headset Pro',
-      type: 'physical',
-      rarity: 'legendary',
-      image: 'https://images.unsplash.com/photo-1599669454699-248893623440?w=100&h=100&fit=crop',
-      stock: 5,
-      isActive: true,
-      lastModified: new Date('2024-12-20'),
-    },
-    {
-      id: '2',
-      nameLv: '€50 Bonuss',
-      nameRu: '€50 Бонус',
-      nameEn: '€50 Bonus',
-      type: 'balance',
-      rarity: 'epic',
-      image: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=100&h=100&fit=crop',
-      stock: 0,
-      isActive: true,
-      lastModified: new Date('2024-12-22'),
-    },
-    {
-      id: '3',
-      nameLv: 'AK-47 | Redline',
-      nameRu: 'AK-47 | Redline',
-      nameEn: 'AK-47 | Redline',
-      type: 'virtual',
-      rarity: 'mythic',
-      image: 'https://images.unsplash.com/photo-1625527575307-616f0bb84ad2?w=100&h=100&fit=crop',
-      stock: 2,
-      isActive: true,
-      lastModified: new Date('2024-12-24'),
-    },
-  ]);
+  // Загрузка предметов при монтировании
+  useEffect(() => {
+    fetchItems();
+  }, []);
+
+  const fetchItems = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:3000/api/admin/items');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch items');
+      }
+
+      const data = await response.json();
+      setItems(data.map((item: any) => ({
+        ...item,
+        lastModified: new Date(item.lastModified || item.updatedAt || Date.now()),
+      })));
+    } catch (error) {
+      console.error('Error fetching items:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const rarityColors = {
     common: '#9ca3af',
@@ -94,19 +82,68 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
     return item.nameEn;
   };
 
-  const handleSaveItem = (itemData: any) => {
-    if (editingItem) {
-      setItems(items.map(item => item.id === editingItem.id ? { ...item, ...itemData } : item));
-    } else {
-      setItems([...items, { id: Date.now().toString(), ...itemData, lastModified: new Date() }]);
+  const handleSaveItem = async (itemData: any) => {
+    try {
+      if (editingItem) {
+        // Обновление существующего предмета
+        const response = await fetch(`http://localhost:3000/api/admin/items/${editingItem.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(itemData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update item');
+        }
+
+        const updatedItem = await response.json();
+        setItems(items.map(item => item.id === editingItem.id ? { ...updatedItem, lastModified: new Date(updatedItem.lastModified || updatedItem.updatedAt) } : item));
+      } else {
+        // Создание нового предмета
+        const response = await fetch('http://localhost:3000/api/admin/items', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(itemData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create item');
+        }
+
+        const newItem = await response.json();
+        setItems([...items, { ...newItem, lastModified: new Date(newItem.lastModified || newItem.createdAt) }]);
+      }
+      
+      setShowModal(false);
+      setEditingItem(null);
+    } catch (error) {
+      console.error('Error saving item:', error);
+      alert('Failed to save item. Please try again.');
     }
-    setShowModal(false);
-    setEditingItem(null);
   };
 
-  const handleDeleteItem = (id: string) => {
-    if (confirm('Are you sure you want to delete this item?')) {
+  const handleDeleteItem = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this item?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3000/api/admin/items/${id}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete item');
+      }
+
       setItems(items.filter(item => item.id !== id));
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      alert('Failed to delete item. Please try again.');
     }
   };
 

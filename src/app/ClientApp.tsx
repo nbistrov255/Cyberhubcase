@@ -126,16 +126,29 @@ function ClientAppContent() {
   };
 
   const handleBalanceRefresh = async () => {
-    // TODO: В будущем здесь будет запрос к SmartShell API
-    // const newBalance = await smartshellAPI.getBalance(userId);
-    // setBalance(newBalance);
-    
-    // Пока что просто имитируем обновление баланса
-    console.log('Refreshing balance from SmartShell API...');
-    
-    // Можно добавить визуальный feedback
-    // Например, случайное изменение для демонстрации
-    // setBalance(prevBalance => prevBalance + (Math.random() * 10 - 5));
+    try {
+      const response = await fetch('http://localhost:3000/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pc_name: 'PC03' }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh balance');
+      }
+
+      const data = await response.json();
+      
+      // Обновляем баланс из поля dailySum
+      if (data.dailySum !== undefined) {
+        setBalance(data.dailySum);
+        console.log('Balance updated:', data.dailySum);
+      }
+    } catch (error) {
+      console.error('Error refreshing balance:', error);
+    }
   };
 
   return (

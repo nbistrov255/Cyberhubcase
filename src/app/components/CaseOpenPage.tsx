@@ -90,40 +90,65 @@ export function CaseOpenPage({ caseName, caseImage, deposited, required, onBack,
     setRouletteItems(items);
   }, []);
 
-  const handleOpen = () => {
+  const handleOpen = async () => {
     if (!canOpen || isSpinning) return;
 
     setIsSpinning(true);
     
-    // Select winning item
-    const winningItem = mockCaseContents[Math.floor(Math.random() * mockCaseContents.length)];
+    try {
+      // Отправляем запрос на сервер для открытия кейса
+      const response = await fetch('http://localhost:3000/api/cases/open', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          caseName: caseName,
+          // Можно добавить дополнительные параметры, если требуется
+          // userId: userId, // если есть система авторизации
+        }),
+      });
 
-    // Calculate final position (center on winning item)
-    const itemWidth = 200;
-    const winningIndex = 50;
-    
-    // Replace item at winning position
-    const updatedItems = [...rouletteItems];
-    updatedItems[winningIndex] = { ...winningItem, id: `winning-${Date.now()}` };
-    setRouletteItems(updatedItems);
+      if (!response.ok) {
+        throw new Error('Failed to open case');
+      }
 
-    // Calculate offset to center winning item
-    const containerWidth = containerRef.current?.offsetWidth || 0;
-    const targetOffset = -(winningIndex * itemWidth) + (containerWidth / 2) - (itemWidth / 2);
-    
-    // Add random offset for variation
-    const randomOffset = (Math.random() - 0.5) * 40;
-    const finalOffset = targetOffset + randomOffset;
+      const data = await response.json();
+      
+      // Используем полученный приз из сервера
+      const winningItem = data.prize || mockCaseContents[Math.floor(Math.random() * mockCaseContents.length)];
+      
+      // Calculate final position (center on winning item)
+      const itemWidth = 200;
+      const winningIndex = 50;
+      
+      // Replace item at winning position
+      const updatedItems = [...rouletteItems];
+      updatedItems[winningIndex] = { ...winningItem, id: `winning-${Date.now()}` };
+      setRouletteItems(updatedItems);
 
-    setTimeout(() => {
-      setOffset(finalOffset);
-    }, 50);
+      // Calculate offset to center winning item
+      const containerWidth = containerRef.current?.offsetWidth || 0;
+      const targetOffset = -(winningIndex * itemWidth) + (containerWidth / 2) - (itemWidth / 2);
+      
+      // Add random offset for variation
+      const randomOffset = (Math.random() - 0.5) * 40;
+      const finalOffset = targetOffset + randomOffset;
 
-    // Show win after animation
-    setTimeout(() => {
+      setTimeout(() => {
+        setOffset(finalOffset);
+      }, 50);
+
+      // Show win after animation
+      setTimeout(() => {
+        setIsSpinning(false);
+        onWin(winningItem);
+      }, 5000);
+    } catch (error) {
+      console.error('Error opening case:', error);
       setIsSpinning(false);
-      onWin(winningItem);
-    }, 5000);
+      alert('Failed to open case. Please try again.');
+    }
   };
 
   return (

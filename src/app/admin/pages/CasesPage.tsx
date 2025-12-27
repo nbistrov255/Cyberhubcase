@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
@@ -26,42 +26,34 @@ export function CasesPage({ userRole }: CasesPageProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'daily' | 'monthly'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'published' | 'archived'>('all');
+  const [cases, setCases] = useState<Case[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [cases, setCases] = useState<Case[]>([
-    {
-      id: '1',
-      nameLv: 'Ikdienas Zelta Kaste',
-      nameRu: 'Ежедневный Золотой Кейс',
-      nameEn: 'Daily Gold Case',
-      type: 'daily',
-      threshold: 5,
-      status: 'published',
-      image: 'https://images.unsplash.com/photo-1614294148960-9aa740632a87?w=200&h=150&fit=crop',
-      lastModified: new Date('2024-12-20'),
-    },
-    {
-      id: '2',
-      nameLv: 'Premium Mēneša Kaste',
-      nameRu: 'Премиум Месячный Кейс',
-      nameEn: 'Premium Monthly Case',
-      type: 'monthly',
-      threshold: 50,
-      status: 'published',
-      image: 'https://images.unsplash.com/photo-1606041011872-596597976673?w=200&h=150&fit=crop',
-      lastModified: new Date('2024-12-22'),
-    },
-    {
-      id: '3',
-      nameLv: 'Starter Kaste',
-      nameRu: 'Стартовый Кейс',
-      nameEn: 'Starter Case',
-      type: 'daily',
-      threshold: 0,
-      status: 'draft',
-      image: 'https://images.unsplash.com/photo-1511512578047-dfb367046420?w=200&h=150&fit=crop',
-      lastModified: new Date('2024-12-24'),
-    },
-  ]);
+  // Загрузка кейсов при монтировании
+  useEffect(() => {
+    fetchCases();
+  }, []);
+
+  const fetchCases = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('http://localhost:3000/api/admin/cases');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch cases');
+      }
+
+      const data = await response.json();
+      setCases(data.map((caseItem: any) => ({
+        ...caseItem,
+        lastModified: new Date(caseItem.lastModified || caseItem.updatedAt || Date.now()),
+      })));
+    } catch (error) {
+      console.error('Error fetching cases:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const canEdit = ['owner', 'admin'].includes(userRole);
 
@@ -104,28 +96,67 @@ export function CasesPage({ userRole }: CasesPageProps) {
     setIsModalOpen(false);
   };
 
-  const handleSave = (formData: CaseFormData) => {
-    if (selectedCase) {
-      // Edit existing case
-      const updatedCases = cases.map((c) =>
-        c.id === selectedCase.id ? { ...c, ...formData, lastModified: new Date() } : c
-      );
-      setCases(updatedCases);
-    } else {
-      // Add new case
-      const newCase: Case = {
-        ...formData,
-        id: Date.now().toString(),
-        lastModified: new Date(),
-      };
-      setCases([...cases, newCase]);
+  const handleSave = async (formData: CaseFormData) => {
+    try {
+      if (selectedCase) {
+        // Обновление существующего кейса
+        const response = await fetch(`http://localhost:3000/api/admin/cases/${selectedCase.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update case');
+        }
+
+        const updatedCase = await response.json();
+        setCases(cases.map((c) => c.id === selectedCase.id ? { ...updatedCase, lastModified: new Date(updatedCase.lastModified || updatedCase.updatedAt) } : c));
+      } else {
+        // Создание нового кейса
+        const response = await fetch('http://localhost:3000/api/admin/cases', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create case');
+        }
+
+        const newCase = await response.json();
+        setCases([...cases, { ...newCase, lastModified: new Date(newCase.lastModified || newCase.createdAt) }]);
+      }
+      
+      closeModal();
+    } catch (error) {
+      console.error('Error saving case:', error);
+      alert('Failed to save case. Please try again.');
     }
-    closeModal();
   };
 
-  const handleDelete = (caseId: string) => {
-    if (confirm(t('cases.deleteConfirm'))) {
+  const handleDelete = async (caseId: string) => {
+    if (!confirm(t('cases.deleteConfirm'))) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`http://localhost:3000/api/admin/cases/${caseId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete case');
+      }
+
       setCases(cases.filter((c) => c.id !== caseId));
+    } catch (error) {
+      console.error('Error deleting case:', error);
+      alert('Failed to delete case. Please try again.');
     }
   };
 
