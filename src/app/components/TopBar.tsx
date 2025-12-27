@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { Settings, User, DollarSign, Trophy, Box, RotateCw, Crown, Zap, Users, Circle, Diamond, Star, Flame } from 'lucide-react';
 import { LiveFeedItem } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
-import knifeImage from 'figma:asset/8a7bf4617995ef63e53b9a57a5383453325a0488.png';
+
+// Заменено figma:asset импорт на прямую ссылку
+const knifeImage = "https://i.ibb.co/cXCCBcfV/unnamed.png";
 
 interface TopBarProps {
   balance: number;
