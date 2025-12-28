@@ -6,7 +6,7 @@ import path from "path"
 export default defineConfig({
   plugins: [
     react(),
-    tailwindcss(), // Required for Tailwind v4
+    tailwindcss(),
   ],
   resolve: {
     alias: {

@@ -1,8 +1,9 @@
+/* Google Fonts MUST be first */
+@import url('https://fonts.googleapis.com/css2?family=Aldrich&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap');
+
 /* Import Tailwind CSS v4 */
 @import './tailwind.css';
-
-/* Import fonts */
-@import './fonts.css';
 
 /* Import theme variables */
 @import './theme.css';

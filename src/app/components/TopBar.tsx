@@ -18,174 +18,6 @@ interface TopBarProps {
   onBalanceRefresh?: () => void; // Добавили функцию для обновления баланса
 }
 
-const mockLiveFeed: LiveFeedItem[] = [
-  {
-    id: '1',
-    itemName: 'AK-47 | Fire Serpent',
-    itemImage: knifeImage,
-    rarity: 'mythic',
-    playerName: 'ProGamer_2024',
-    playerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop',
-    playerLevel: 44,
-    caseName: 'Christmas Drops',
-    timestamp: new Date(),
-  },
-  {
-    id: '2',
-    itemName: 'M4A4 | Howl',
-    itemImage: knifeImage,
-    rarity: 'legendary',
-    playerName: 'SkillMaster',
-    playerAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100&h=100&fit=crop',
-    playerLevel: 38,
-    caseName: 'Silent Night Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '3',
-    itemName: 'AWP | Dragon Lore',
-    itemImage: knifeImage,
-    rarity: 'mythic',
-    playerName: 'SniperElite',
-    playerAvatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=100&h=100&fit=crop',
-    playerLevel: 52,
-    caseName: 'Legendary Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '4',
-    itemName: 'Glock-18 | Fade',
-    itemImage: knifeImage,
-    rarity: 'epic',
-    playerName: 'QuickDraw',
-    playerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
-    playerLevel: 29,
-    caseName: 'Daily Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '5',
-    itemName: 'Knife | Karambit Fade',
-    itemImage: knifeImage,
-    rarity: 'mythic',
-    playerName: 'KnifeKing',
-    playerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
-    playerLevel: 61,
-    caseName: 'Premium Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '6',
-    itemName: 'USP-S | Kill Confirmed',
-    itemImage: knifeImage,
-    rarity: 'legendary',
-    playerName: 'Headshot999',
-    playerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop',
-    playerLevel: 47,
-    caseName: 'Elite Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '7',
-    itemName: 'P90 | Asiimov',
-    itemImage: knifeImage,
-    rarity: 'epic',
-    playerName: 'SpeedRunner',
-    playerAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100&h=100&fit=crop',
-    playerLevel: 33,
-    caseName: 'Speed Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '8',
-    itemName: 'M4A1-S | Hyper Beast',
-    itemImage: knifeImage,
-    rarity: 'mythic',
-    playerName: 'BeastMode',
-    playerAvatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=100&h=100&fit=crop',
-    playerLevel: 55,
-    caseName: 'Beast Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '9',
-    itemName: 'Desert Eagle | Blaze',
-    itemImage: knifeImage,
-    rarity: 'legendary',
-    playerName: 'FireStarter',
-    playerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
-    playerLevel: 41,
-    caseName: 'Blaze Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '10',
-    itemName: 'MAC-10 | Neon Rider',
-    itemImage: knifeImage,
-    rarity: 'epic',
-    playerName: 'NeonKing',
-    playerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
-    playerLevel: 36,
-    caseName: 'Neon Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '11',
-    itemName: 'Five-Seven | Monkey Business',
-    itemImage: knifeImage,
-    rarity: 'rare',
-    playerName: 'MonkeyPro',
-    playerAvatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop',
-    playerLevel: 28,
-    caseName: 'Jungle Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '12',
-    itemName: 'Galil AR | Cerberus',
-    itemImage: knifeImage,
-    rarity: 'mythic',
-    playerName: 'CerberusGod',
-    playerAvatar: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=100&h=100&fit=crop',
-    playerLevel: 58,
-    caseName: 'Mythic Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '13',
-    itemName: 'FAMAS | Roll Cage',
-    itemImage: knifeImage,
-    rarity: 'rare',
-    playerName: 'RollMaster',
-    playerAvatar: 'https://images.unsplash.com/photo-1527980965255-d3b416303d12?w=100&h=100&fit=crop',
-    playerLevel: 25,
-    caseName: 'Daily Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '14',
-    itemName: 'P250 | Asiimov',
-    itemImage: knifeImage,
-    rarity: 'epic',
-    playerName: 'P250Pro',
-    playerAvatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop',
-    playerLevel: 39,
-    caseName: 'Elite Case',
-    timestamp: new Date(),
-  },
-  {
-    id: '15',
-    itemName: 'SSG 08 | Blood in the Water',
-    itemImage: knifeImage,
-    rarity: 'legendary',
-    playerName: 'SharkHunter',
-    playerAvatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&h=100&fit=crop',
-    playerLevel: 49,
-    caseName: 'Ocean Case',
-    timestamp: new Date(),
-  },
-];
-
 const rarityColors = {
   common: '#6b7280',
   rare: '#3b82f6',
@@ -249,19 +81,46 @@ export function TopBar({
 }: TopBarProps) {
   const { profile } = useAuth(); // Получаем профиль из контекста
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
-  const [feedItems, setFeedItems] = useState<LiveFeedItem[]>(mockLiveFeed);
+  const [feedItems, setFeedItems] = useState<LiveFeedItem[]>([]);
   const [activeFilter, setActiveFilter] = useState<'all' | 'top'>('all');
   const [isTopBarVisible, setIsTopBarVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // Загрузка Live Feed из API
   useEffect(() => {
-    const interval = setInterval(() => {
-      setFeedItems((prev) => {
-        const newItem = generateRandomLiveFeedItem();
-        return [newItem, ...prev.slice(0, 24)]; // Увеличили с 9 до 24 для заполнения экрана
-      });
-    }, 5000);
+    const fetchLiveFeed = async () => {
+      try {
+        const response = await fetch('/api/stats/live');
+        
+        if (!response.ok) {
+          console.error('Live feed API error:', response.status, response.statusText);
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.success && data.spins && Array.isArray(data.spins)) {
+          const items: LiveFeedItem[] = data.spins.map((spin: any) => ({
+            id: spin.id || `${Date.now()}-${Math.random()}`,
+            itemName: spin.prize_name || 'Unknown Item',
+            itemImage: spin.prize_image || knifeImage,
+            rarity: (spin.prize_rarity || 'common').toLowerCase() as 'common' | 'rare' | 'epic' | 'legendary' | 'mythic',
+            playerName: spin.player_nickname || 'Anonymous',
+            playerAvatar: spin.player_avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop',
+            playerLevel: spin.player_level || 1,
+            caseName: spin.case_name || 'Mystery Case',
+            timestamp: spin.created_at ? new Date(spin.created_at) : new Date(),
+          }));
+          setFeedItems(items);
+        }
+      } catch (err) {
+        console.error('Failed to fetch live feed:', err);
+      }
+    };
+
+    fetchLiveFeed();
+    const interval = setInterval(fetchLiveFeed, 10000); // Обновляем каждые 10 секунд
 
     return () => clearInterval(interval);
   }, []);
@@ -401,7 +260,7 @@ export function TopBar({
                 
                 {/* Level Bar - Bottom */}
                 <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-sm flex items-center justify-center" style={{ height: '14px' }}>
-                  <span className="text-[9px] font-bold text-white/90 tracking-wide">LVL 44</span>
+                  <span className="text-[9px] font-bold text-white/90 tracking-wide">{profile?.nickname || 'Guest'}</span>
                 </div>
               </button>
             )}
@@ -648,9 +507,4 @@ export function TopBar({
       </div>
     </>
   );
-}
-
-function generateRandomLiveFeedItem(): LiveFeedItem {
-  const randomItem = mockLiveFeed[Math.floor(Math.random() * mockLiveFeed.length)];
-  return { ...randomItem, id: Date.now().toString(), timestamp: new Date() };
 }

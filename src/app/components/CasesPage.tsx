@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Lock, X, Clock } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { useAuth } from '../contexts/AuthContext';
 import '../../styles/fonts.css';
 
 interface CaseData {
@@ -14,162 +15,6 @@ interface CaseData {
   usedToday: boolean;
   isEvent?: boolean;
 }
-
-const eventCases: CaseData[] = [
-  {
-    id: 'event-1',
-    name: 'Festive Fortune',
-    image: 'https://i.ibb.co/q3QY6t2b/Chat-GPT-Image-24-2025-04-02-44.png',
-    tier: 'Premium',
-    deposited: 29,
-    required: 29,
-    usedToday: false,
-    isEvent: true,
-  },
-  {
-    id: 'event-2',
-    name: 'Holiday Jackpot',
-    image: 'https://i.ibb.co/bRChPPVb/boxcard.png',
-    tier: 'Legendary',
-    deposited: 25,
-    required: 49,
-    usedToday: false,
-    isEvent: true,
-  },
-  {
-    id: 'event-3',
-    name: 'Winter Exclusive',
-    image: 'https://i.ibb.co/q3QY6t2b/Chat-GPT-Image-24-2025-04-02-44.png',
-    tier: 'Epic',
-    deposited: 69,
-    required: 69,
-    usedToday: true,
-    isEvent: true,
-  },
-  {
-    id: 'event-4',
-    name: 'Snowfall Treasure',
-    image: 'https://i.ibb.co/bRChPPVb/boxcard.png',
-    tier: 'Mythic',
-    deposited: 45,
-    required: 99,
-    usedToday: false,
-    isEvent: true,
-  },
-  {
-    id: 'event-5',
-    name: 'Grand Winter Prize',
-    image: 'https://i.ibb.co/q3QY6t2b/Chat-GPT-Image-24-2025-04-02-44.png',
-    tier: 'Mythic',
-    deposited: 100,
-    required: 149,
-    usedToday: false,
-    isEvent: true,
-  },
-];
-
-const permanentCases: CaseData[] = [
-  {
-    id: 'perm-1',
-    name: 'Starter Case',
-    image: 'https://i.ibb.co/bRChPPVb/boxcard.png',
-    tier: 'Common',
-    deposited: 5,
-    required: 5,
-    usedToday: false,
-    isEvent: false,
-  },
-  {
-    id: 'perm-2',
-    name: 'Bronze Case',
-    image: 'https://i.ibb.co/q3QY6t2b/Chat-GPT-Image-24-2025-04-02-44.png',
-    tier: 'Rare',
-    deposited: 0,
-    required: 3,
-    usedToday: false,
-    isEvent: false,
-  },
-  {
-    id: 'perm-3',
-    name: 'Silver Case',
-    image: 'https://i.ibb.co/bRChPPVb/boxcard.png',
-    tier: 'Rare',
-    deposited: 10,
-    required: 10,
-    usedToday: false,
-    isEvent: false,
-  },
-  {
-    id: 'perm-4',
-    name: 'Gold Case',
-    image: 'https://i.ibb.co/q3QY6t2b/Chat-GPT-Image-24-2025-04-02-44.png',
-    tier: 'Epic',
-    deposited: 3,
-    required: 10,
-    usedToday: false,
-    isEvent: false,
-  },
-  {
-    id: 'perm-5',
-    name: 'Platinum Case',
-    image: 'https://i.ibb.co/bRChPPVb/boxcard.png',
-    tier: 'Legendary',
-    deposited: 25,
-    required: 25,
-    usedToday: false,
-    isEvent: false,
-  },
-  {
-    id: 'perm-6',
-    name: 'Diamond Case',
-    image: 'https://i.ibb.co/q3QY6t2b/Chat-GPT-Image-24-2025-04-02-44.png',
-    tier: 'Legendary',
-    deposited: 10,
-    required: 50,
-    usedToday: false,
-    isEvent: false,
-  },
-  {
-    id: 'perm-7',
-    name: 'Ruby Case',
-    image: 'https://i.ibb.co/bRChPPVb/boxcard.png',
-    tier: 'Mythic',
-    deposited: 70,
-    required: 100,
-    usedToday: false,
-    isEvent: false,
-  },
-  {
-    id: 'perm-8',
-    name: 'Emerald Case',
-    image: 'https://i.ibb.co/q3QY6t2b/Chat-GPT-Image-24-2025-04-02-44.png',
-    tier: 'Epic',
-    deposited: 15,
-    required: 15,
-    usedToday: true,
-    isEvent: false,
-  },
-  {
-    id: 'perm-9',
-    name: 'Sapphire Case',
-    image: 'https://i.ibb.co/bRChPPVb/boxcard.png',
-    tier: 'Rare',
-    deposited: 7,
-    required: 7,
-    usedToday: false,
-    isEvent: false,
-  },
-  {
-    id: 'perm-10',
-    name: 'Crystal Case',
-    image: 'https://i.ibb.co/q3QY6t2b/Chat-GPT-Image-24-2025-04-02-44.png',
-    tier: 'Epic',
-    deposited: 20,
-    required: 20,
-    usedToday: false,
-    isEvent: false,
-  },
-];
 
 const tierColors = {
   Common: '#6b7280',
@@ -186,8 +31,37 @@ interface CasesPageProps {
 }
 
 export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
+  const { profile } = useAuth();
   const [hoveredCase, setHoveredCase] = useState<string | null>(null);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
+  const [cases, setCases] = useState<CaseData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!isAuthenticated || !profile) {
+      setLoading(false);
+      return;
+    }
+
+    // Преобразовать profile.cases в CaseData[]
+    const mappedCases: CaseData[] = (profile.cases || []).map((apiCase) => ({
+      id: apiCase.id,
+      name: apiCase.type === 'daily' ? `Daily Case (${apiCase.threshold}€)` : `Monthly Case (${apiCase.threshold}€)`,
+      image: 'https://i.ibb.co/bRChPPVb/boxcard.png',
+      tier: apiCase.type === 'daily' ? 'Common' : 'Premium',
+      deposited: apiCase.progress,
+      required: apiCase.threshold,
+      usedToday: !apiCase.available,
+      isEvent: false,
+    }));
+
+    setCases(mappedCases);
+    setLoading(false);
+  }, [profile, isAuthenticated]);
+
+  // Разделить на event и permanent
+  const eventCases = cases.filter(c => c.isEvent);
+  const permanentCases = cases.filter(c => !c.isEvent);
   const [showTermsRules, setShowTermsRules] = useState(false);
   
   // Countdown timer state
