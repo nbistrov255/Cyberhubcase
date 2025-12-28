@@ -39,7 +39,7 @@ export function CasesPage({ userRole }: CasesPageProps) {
   const fetchCases = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3000/api/admin/cases');
+      const response = await fetch('/api/admin/cases');
       
       if (!response.ok) {
         throw new Error('Failed to fetch cases');
@@ -102,7 +102,7 @@ export function CasesPage({ userRole }: CasesPageProps) {
     try {
       if (selectedCase) {
         // Обновление существующего кейса
-        const response = await fetch(`http://localhost:3000/api/admin/cases/${selectedCase.id}`, {
+        const response = await fetch(`/api/admin/cases/${selectedCase.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -118,7 +118,7 @@ export function CasesPage({ userRole }: CasesPageProps) {
         setCases(cases.map((c) => c.id === selectedCase.id ? { ...updatedCase, lastModified: new Date(updatedCase.lastModified || updatedCase.updatedAt) } : c));
       } else {
         // Создание нового кейса
-        const response = await fetch('http://localhost:3000/api/admin/cases', {
+        const response = await fetch('/api/admin/cases', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -147,7 +147,7 @@ export function CasesPage({ userRole }: CasesPageProps) {
     }
 
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/cases/${caseId}`, {
+      const response = await fetch(`/api/admin/cases/${caseId}`, {
         method: 'DELETE',
       });
 

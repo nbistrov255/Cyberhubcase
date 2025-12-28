@@ -253,14 +253,14 @@ export function TopBar({
               >
                 {/* Avatar Image */}
                 <img
-                  src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop"
+                  src={profile?.avatar || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop"}
                   alt="Player Avatar"
                   className="w-full h-full object-cover"
                 />
                 
                 {/* Level Bar - Bottom */}
                 <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur-sm flex items-center justify-center" style={{ height: '14px' }}>
-                  <span className="text-[9px] font-bold text-white/90 tracking-wide">{profile?.nickname || 'Guest'}</span>
+                  <span className="text-[9px] font-bold text-white/90 tracking-wide">LVL 1</span>
                 </div>
               </button>
             )}
