@@ -21,6 +21,10 @@ export interface UserProfile {
   dailySum: number;
   monthlySum: number;
   cases: CaseInfo[];
+  avatar?: string;
+  level?: number;
+  currentXP?: number;
+  openedCases?: number;
 }
 
 // Auth Session

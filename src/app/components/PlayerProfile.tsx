@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { FooterSection } from './FooterSection';
+import { useAuth } from '../contexts/AuthContext';
 
 interface PlayerProfileProps {
   isPrivate: boolean;
@@ -195,6 +196,7 @@ function CountdownTimer({ request, onUpdate }: { request: ClaimRequest; onUpdate
 }
 
 export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfileProps) {
+  const { profile } = useAuth();
   const [tradeLink, setTradeLink] = useState('https://steamcommunity.com/tradeoffer/new/?partner=123456789&token=abcdef');
   const [isEditingTradeLink, setIsEditingTradeLink] = useState(false);
   const [showLevelsModal, setShowLevelsModal] = useState(false);
@@ -203,24 +205,78 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
   const [minimizedRequests, setMinimizedRequests] = useState<Set<string>>(new Set());
   const [inventoryPage, setInventoryPage] = useState(0);
   const [winHistoryPage, setWinHistoryPage] = useState(0);
+  const [profileBackground, setProfileBackground] = useState('https://i.ibb.co/0jf2XZFw/Chat-GPT-Image-25-2025-00-01-32.png');
+  const [inventory, setInventory] = useState<any[]>([]);
+  const [loadingInventory, setLoadingInventory] = useState(true);
 
-  const level = 44;
-  const currentXP = 8750;
-  const requiredXP = 10000;
+  // Загрузка фона профиля из настроек
+  useEffect(() => {
+    try {
+      const savedSettings = localStorage.getItem('siteSettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        if (settings.profileBackground) {
+          setProfileBackground(settings.profileBackground);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading profile background:', error);
+    }
+  }, []);
+
+  // Загрузка инвентаря из API
+  useEffect(() => {
+    const fetchInventory = async () => {
+      try {
+        setLoadingInventory(true);
+        const token = localStorage.getItem('session_token');
+        const response = await fetch('/api/inventory', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setInventory(Array.isArray(data) ? data : []);
+        } else {
+          setInventory([]);
+        }
+      } catch (error) {
+        console.error('Error fetching inventory:', error);
+        setInventory([]);
+      } finally {
+        setLoadingInventory(false);
+      }
+    };
+
+    fetchInventory();
+  }, []);
+
+  // Расчет уровня и XP на основе депозитов
+  const level = profile?.level || Math.floor((profile?.dailySum || 0) / 100) + 1;
+  const currentXP = (profile?.dailySum || 0) % 100;
+  const requiredXP = 100;
   const xpProgress = (currentXP / requiredXP) * 100;
+  const openedCases = profile?.openedCases || 0;
+
+  // Имя и аватар игрока из профиля
+  const displayName = profile?.nickname || playerName;
+  const avatarUrl = profile?.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop';
 
   // Pagination constants
   const ITEMS_PER_PAGE = 5;
-  const totalPages = Math.ceil(mockInventoryPreview.length / ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(inventory.length / ITEMS_PER_PAGE);
   const startIndex = inventoryPage * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
-  const currentItems = mockInventoryPreview.slice(startIndex, endIndex);
+  const currentItems = inventory.slice(startIndex, endIndex);
 
-  // Win History Pagination
-  const totalWinHistoryPages = Math.ceil(mockWinHistory.length / ITEMS_PER_PAGE);
+  // Win History - пока пустой массив (нет API endpoint)
+  const winHistory: any[] = [];
+  const totalWinHistoryPages = Math.ceil(winHistory.length / ITEMS_PER_PAGE);
   const winHistoryStartIndex = winHistoryPage * ITEMS_PER_PAGE;
   const winHistoryEndIndex = winHistoryStartIndex + ITEMS_PER_PAGE;
-  const currentWinHistoryItems = mockWinHistory.slice(winHistoryStartIndex, winHistoryEndIndex);
+  const currentWinHistoryItems = winHistory.slice(winHistoryStartIndex, winHistoryEndIndex);
 
   const handleNextPage = () => {
     if (inventoryPage < totalPages - 1) {
@@ -239,14 +295,14 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
   };
 
   const handleClaimItem = (itemId: string) => {
-    const item = mockInventoryPreview.find(i => i.id === itemId);
+    const item = inventory.find(i => i.id === itemId);
     if (!item) return;
 
     const newRequest: ClaimRequest = {
       id: itemId,
       requestId: generateRequestId(),
-      itemName: item.name,
-      itemRarity: item.rarity,
+      itemName: item.title || item.name,
+      itemRarity: (item.rarity || 'common') as keyof typeof rarityColors,
       timestamp: new Date(),
       status: 'pending',
       timeRemaining: 3600, // 1 hour in seconds
@@ -307,7 +363,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
           className="relative rounded-3xl overflow-hidden border-2 border-white/10 p-12" 
           style={{ 
             backgroundColor: '#131217',
-            backgroundImage: 'url(https://i.ibb.co/0jf2XZFw/Chat-GPT-Image-25-2025-00-01-32.png)',
+            backgroundImage: `url(${profileBackground})`,
             backgroundSize: 'cover',
             backgroundPosition: 'center',
             backgroundRepeat: 'no-repeat',
@@ -386,8 +442,8 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
               {/* Avatar */}
               <div className="relative w-40 h-40 rounded-full overflow-hidden" style={{ zIndex: 20 }}>
                 <img
-                  src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&h=200&fit=crop"
-                  alt={playerName}
+                  src={avatarUrl}
+                  alt={displayName}
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -399,7 +455,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
             </div>
 
             {/* Player Name */}
-            <h1 className="text-4xl font-bold mb-2">{playerName}</h1>
+            <h1 className="text-4xl font-bold mb-2">{displayName}</h1>
 
             {/* Stats Row */}
             <div className="flex items-center gap-8 text-center">
@@ -412,7 +468,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                 <div className="text-sm text-gray-400">XP Progress</div>
               </div>
               <div>
-                <div className="text-2xl font-bold">512</div>
+                <div className="text-2xl font-bold">{openedCases}</div>
                 <div className="text-sm text-gray-400">Cases Opened</div>
               </div>
             </div>
@@ -568,22 +624,44 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
               }}
             >
               <AnimatePresence mode="wait">
-                <motion.div
-                  key={inventoryPage}
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="grid grid-cols-5 gap-3"
-                >
-                  {currentItems.map((item) => {
+                {loadingInventory ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-20"
+                  >
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white/30 mb-4"></div>
+                    <p className="text-gray-400">Loading inventory...</p>
+                  </motion.div>
+                ) : inventory.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-20"
+                  >
+                    <p className="text-xl text-gray-400 mb-2">Inventory is empty</p>
+                    <p className="text-sm text-gray-500">Open cases to win prizes!</p>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key={inventoryPage}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="grid grid-cols-5 gap-3"
+                  >
+                    {currentItems.map((item) => {
                     const isHovered = hoveredItemId === item.id;
                     const hasClaimRequest = claimRequests.some(req => req.id === item.id);
                     
                     // Split item name (e.g., "AK-47 | Fire Serpent" -> ["AK-47", "Fire Serpent"])
-                    const nameParts = item.name.split(' | ');
+                    const itemName = item.title || item.name || 'Unknown Item';
+                    const nameParts = itemName.split(' | ');
                     const weaponName = nameParts[0] || '';
-                    const skinName = nameParts[1] || item.name;
+                    const skinName = nameParts[1] || itemName;
+                    const itemRarity = (item.rarity || 'common') as keyof typeof rarityColors;
+                    const itemImage = item.image_url || item.image || 'https://via.placeholder.com/200';
                     
                     return (
                       <motion.div
@@ -596,9 +674,9 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                           width: '240px',
                           height: '200px',
                           backgroundColor: '#1a1f26',
-                          border: isHovered ? `1px solid ${rarityColors[item.rarity]}cc` : '1px solid #2d3339',
+                          border: isHovered ? `1px solid ${rarityColors[itemRarity]}cc` : '1px solid #2d3339',
                           boxShadow: isHovered 
-                            ? `inset 0 0 30px ${rarityColors[item.rarity]}30`
+                            ? `inset 0 0 30px ${rarityColors[itemRarity]}30`
                             : 'none',
                           overflow: 'hidden',
                         }}
@@ -607,7 +685,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                         <div 
                           className="absolute inset-0 pointer-events-none"
                           style={{
-                            backgroundColor: rarityColors[item.rarity],
+                            backgroundColor: rarityColors[itemRarity],
                             opacity: 0.15,
                           }}
                         />
@@ -623,7 +701,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                           <div
                             className="w-22 h-22"
                             style={{
-                              backgroundColor: rarityColors[item.rarity],
+                              backgroundColor: rarityColors[itemRarity],
                               maskImage: 'url(https://i.ibb.co/gMY5s4S6/free-icon-hexagon-2875801.png)',
                               maskSize: 'contain',
                               maskRepeat: 'no-repeat',
@@ -634,7 +712,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                               WebkitMaskPosition: 'center',
                               width: '116px',
                               height: '116px',
-                              filter: isHovered ? `drop-shadow(0 0 20px ${rarityColors[item.rarity]})` : 'none',
+                              filter: isHovered ? `drop-shadow(0 0 20px ${rarityColors[itemRarity]})` : 'none',
                             }}
                           />
                         </div>
@@ -758,7 +836,8 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                       </motion.div>
                     );
                   })}
-                </motion.div>
+                  </motion.div>
+                )}
               </AnimatePresence>
             </div>
           </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Save } from 'lucide-react';
 import { toast } from 'sonner';
@@ -30,14 +30,7 @@ export function SettingsPage({ userRole }: SettingsPageProps) {
     bannerBackground: 'https://i.ibb.co/nqGS31TR/Chat-GPT-Image-24-2025-04-05-54.png',
     profileBackground: 'https://i.ibb.co/0jf2XZFw/Chat-GPT-Image-25-2025-00-01-32.png',
     snowEffect: true,
-    maintenanceMode: (() => {
-      try {
-        const saved = localStorage.getItem('maintenanceMode');
-        return saved === 'true';
-      } catch {
-        return false;
-      }
-    })(),
+    maintenanceMode: false,
     // General
     lowStockThreshold: 10,
     expireTtl: 48,
@@ -50,9 +43,26 @@ export function SettingsPage({ userRole }: SettingsPageProps) {
     },
   });
 
+  // Загрузка настроек из localStorage при монтировании
+  useEffect(() => {
+    try {
+      const savedSettings = localStorage.getItem('siteSettings');
+      if (savedSettings) {
+        const parsed = JSON.parse(savedSettings);
+        setSettings(parsed);
+      }
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    }
+  }, []);
+
   const handleSave = () => {
     console.log('Settings saved:', settings);
-    // Save maintenance mode to localStorage so client app can check it
+    
+    // Сохраняем все настройки в localStorage под ключом 'siteSettings'
+    localStorage.setItem('siteSettings', JSON.stringify(settings));
+    
+    // Также сохраняем maintenanceMode отдельно для обратной совместимости
     localStorage.setItem('maintenanceMode', JSON.stringify(settings.maintenanceMode));
     
     // Show success toast

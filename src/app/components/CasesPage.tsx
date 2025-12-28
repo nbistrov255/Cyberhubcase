@@ -36,6 +36,22 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [cases, setCases] = useState<CaseData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [bannerBackground, setBannerBackground] = useState('https://i.ibb.co/nqGS31TR/Chat-GPT-Image-24-2025-04-05-54.png');
+
+  // Загрузка настроек баннера из localStorage
+  useEffect(() => {
+    try {
+      const savedSettings = localStorage.getItem('siteSettings');
+      if (savedSettings) {
+        const settings = JSON.parse(savedSettings);
+        if (settings.bannerBackground) {
+          setBannerBackground(settings.bannerBackground);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading banner settings:', error);
+    }
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated || !profile) {
@@ -491,7 +507,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
             <div 
               className="relative z-10 px-20 py-10"
               style={{
-                backgroundImage: 'url(https://i.ibb.co/nqGS31TR/Chat-GPT-Image-24-2025-04-05-54.png)',
+                backgroundImage: `url(${bannerBackground})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center',
                 backgroundRepeat: 'no-repeat'
