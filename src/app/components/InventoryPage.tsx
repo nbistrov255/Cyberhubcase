@@ -37,7 +37,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
       setLoading(true);
       const token = localStorage.getItem('session_token');
       
-      const response = await fetch('http://91.107.120.48:3000/api/inventory', {
+      const response = await fetch('/api/inventory', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -64,7 +64,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
     try {
       const token = localStorage.getItem('session_token');
       
-      const response = await fetch('http://91.107.120.48:3000/api/inventory/sell', {
+      const response = await fetch('/api/inventory/sell', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -19,6 +19,8 @@ CyberHub is a full-featured case opening platform with a Counter-Strike aestheti
 ## 📚 Documentation
 
 ### Quick Start Guides
+- **[QUICK_START.md](./QUICK_START.md)** - How to run the project locally 🚀
+- **[TROUBLESHOOTING_STYLES.md](./TROUBLESHOOTING_STYLES.md)** - Fix styling issues 🎨
 - **[DOCS_INDEX.md](./DOCS_INDEX.md)** - Complete documentation navigation 📑
 - **[HOW_TO_EXPORT.md](./HOW_TO_EXPORT.md)** - How to export and run the project
 - **[DOWNLOAD_INSTRUCTIONS.md](./DOWNLOAD_INSTRUCTIONS.md)** - Download and setup instructions

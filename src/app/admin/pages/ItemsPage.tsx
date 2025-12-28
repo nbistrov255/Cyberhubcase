@@ -36,7 +36,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://91.107.120.48:3000/api/admin/items');
+      const response = await fetch('/api/admin/items');
       
       if (!response.ok) {
         throw new Error('Failed to fetch items');
@@ -65,7 +65,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
       
       if (editingItem) {
         // Обновление существующего предмета
-        const response = await fetch(`http://91.107.120.48:3000/api/admin/items/${editingItem.id}`, {
+        const response = await fetch(`/api/admin/items/${editingItem.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -79,7 +79,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
         }
       } else {
         // Создание нового предмета
-        const response = await fetch('http://91.107.120.48:3000/api/admin/items', {
+        const response = await fetch('/api/admin/items', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
 
     try {
       const token = localStorage.getItem('session_token');
-      const response = await fetch(`http://91.107.120.48:3000/api/admin/items/${id}`, {
+      const response = await fetch(`/api/admin/items/${id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`,
