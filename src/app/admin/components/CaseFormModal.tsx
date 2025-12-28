@@ -11,8 +11,8 @@ const DEFAULT_DROP_RATES: Record<Rarity, number> = {
   common: 50,
   rare: 30,
   epic: 15,
-  legendary: 1,
-  mythic: 4,
+  legendary: 4,
+  mythic: 1,
 };
 
 interface Item {
@@ -98,7 +98,7 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
         if (response.ok) {
           const data = await response.json();
           // Преобразуем формат API в формат компонента
-          const items: Item[] = data.map((item: any) => ({
+          const items: Item[] = (data || []).map((item: any) => ({
             id: item.id.toString(),
             nameLv: item.title, // API возвращает только title, используем его для всех языков
             nameRu: item.title,
@@ -106,13 +106,14 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
             type: item.type === 'skin' ? 'virtual' : item.type === 'money' ? 'balance' : 'physical',
             rarity: item.rarity || 'common', // Если rarity нет, используем common
             image: item.image_url,
-            stock: item.stock || 0,
+            stock: item.stock ?? -1, // Если stock нет, используем -1 (бесконечно)
             isActive: true,
           }));
           setAvailableItems(items);
         }
       } catch (error) {
         console.error('Error fetching items:', error);
+        setAvailableItems([]); // Устанавливаем пустой массив в случае ошибки
       } finally {
         setLoadingItems(false);
       }
@@ -137,6 +138,17 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
     if (language === 'lv') return item.nameLv;
     if (language === 'ru') return item.nameRu;
     return item.nameEn;
+  };
+
+  // Функция для отображения Stock
+  const renderStockDisplay = (stock: number) => {
+    if (stock === -1) {
+      return <span className="text-blue-400 font-bold">∞</span>;
+    } else if (stock === 0) {
+      return <span className="text-red-400">0</span>;
+    } else {
+      return <span className="text-green-400">{stock}</span>;
+    }
   };
 
   // Calculate automatic drop chances based on rarity
@@ -186,26 +198,26 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
 
   // Remove item from case
   const removeItemFromCase = (itemId: string) => {
-    const updatedContents = formData.contents?.filter(ci => ci.itemId !== itemId) || [];
+    const updatedContents = (formData.contents || []).filter(ci => ci.itemId !== itemId);
     const recalculated = calculateAutoChances(updatedContents);
     setFormData({ ...formData, contents: recalculated });
   };
 
   // Update custom chance
   const updateItemChance = (itemId: string, newChance: number, isCustom: boolean) => {
-    const updatedContents = formData.contents?.map(ci => {
+    const updatedContents = (formData.contents || []).map(ci => {
       if (ci.itemId === itemId) {
         return { ...ci, dropChance: newChance, customChance: isCustom };
       }
       return ci;
-    }) || [];
+    });
 
     const recalculated = calculateAutoChances(updatedContents);
     setFormData({ ...formData, contents: recalculated });
   };
 
   // Calculate total chance
-  const totalChance = formData.contents?.reduce((sum, item) => sum + item.dropChance, 0) || 0;
+  const totalChance = (formData.contents || []).reduce((sum, item) => sum + item.dropChance, 0);
 
   useEffect(() => {
     if (isOpen) {
@@ -635,7 +647,7 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
                               <div className="text-center py-8">
                                 <p className="text-gray-400">Loading items...</p>
                               </div>
-                            ) : availableItems.filter(item => !formData.contents?.find(ci => ci.itemId === item.id)).map(item => (
+                            ) : (availableItems || []).filter(item => !(formData.contents || []).find(ci => ci.itemId === item.id)).map(item => (
                               <button
                                 key={item.id}
                                 type="button"
@@ -684,8 +696,8 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
                                     <span className="text-xs text-gray-500 capitalize">
                                       {item.type}
                                     </span>
-                                    <span className="text-xs text-gray-500">
-                                      Stock: {item.stock}
+                                    <span className="text-xs text-gray-400">
+                                      Stock: {renderStockDisplay(item.stock)}
                                     </span>
                                   </div>
                                   <p className="text-xs text-gray-500 mt-1">
@@ -698,7 +710,7 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
                               </button>
                             ))}
 
-                            {availableItems.filter(item => !formData.contents?.find(ci => ci.itemId === item.id)).length === 0 && (
+                            {(availableItems || []).filter(item => !(formData.contents || []).find(ci => ci.itemId === item.id)).length === 0 && (
                               <div className="text-center py-8">
                                 <p className="text-gray-400">All items have been added to this case.</p>
                               </div>
@@ -716,7 +728,7 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
                         Case Items ({formData.contents.length})
                       </h3>
 
-                      {formData.contents.map(caseItem => (
+                      {(formData.contents || []).map(caseItem => (
                         <div
                           key={caseItem.itemId}
                           className="rounded-lg p-4 transition-all"
@@ -755,6 +767,9 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
                                 </span>
                                 <span className="text-xs text-gray-500 capitalize">
                                   {caseItem.item.type}
+                                </span>
+                                <span className="text-xs text-gray-400">
+                                  Stock: {renderStockDisplay(caseItem.item.stock)}
                                 </span>
                               </div>
                             </div>
@@ -919,14 +934,14 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
               onClick={handleSubmit}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium"
+              className="px-6 py-2.5 rounded-lg font-bold uppercase transition-all"
               style={{
                 background: '#7c2d3a',
                 color: '#ffffff',
               }}
             >
-              <Save className="w-5 h-5" />
-              {t('common.save')}
+              <Save className="w-5 h-5 inline mr-2" />
+              {t('itemForm.save')}
             </motion.button>
           </div>
         </motion.div>

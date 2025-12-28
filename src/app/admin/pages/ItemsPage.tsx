@@ -4,6 +4,7 @@ import { Plus, Search, Edit, Trash2, Eye } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
 import { ItemFormModal } from '../components/ItemFormModal';
+import { toast } from 'sonner';
 
 interface Item {
   id: number;
@@ -12,6 +13,7 @@ interface Item {
   image_url: string;
   price_eur: number;
   sell_price_eur: number;
+  stock: number;
   created_at?: string;
 }
 
@@ -25,7 +27,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
   const [filterType, setFilterType] = useState<'all' | 'skin' | 'physical' | 'money'>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
+  const [items, setItems] = useState<Item[]>([]); // Инициализация пустым массивом
   const [loading, setLoading] = useState(true);
 
   // Загрузка предметов при монтировании
@@ -43,9 +45,12 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
       }
 
       const data = await response.json();
-      setItems(data);
+      // Безопасная установка данных - всегда массив
+      setItems(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching items:', error);
+      toast.error('Failed to load items');
+      setItems([]); // Устанавливаем пустой массив в случае ошибки
     } finally {
       setLoading(false);
     }
@@ -53,7 +58,8 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
 
   const canEdit = ['owner', 'admin'].includes(userRole);
 
-  const filteredItems = items.filter((item) => {
+  // Безопасный маппинг с проверкой на null/undefined
+  const filteredItems = (items || []).filter((item) => {
     const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterType === 'all' || item.type === filterType;
     return matchesSearch && matchesFilter;
@@ -77,6 +83,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
         if (!response.ok) {
           throw new Error('Failed to update item');
         }
+        toast.success('Item updated successfully');
       } else {
         // Создание нового предмета
         const response = await fetch('/api/admin/items', {
@@ -91,6 +98,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
         if (!response.ok) {
           throw new Error('Failed to create item');
         }
+        toast.success('Item created successfully');
       }
 
       // Перезагрузка списка
@@ -99,7 +107,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
       setEditingItem(null);
     } catch (error) {
       console.error('Error saving item:', error);
-      alert('Failed to save item');
+      toast.error('Failed to save item');
     }
   };
 
@@ -119,10 +127,22 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
         throw new Error('Failed to delete item');
       }
 
+      toast.success('Item deleted successfully');
       await fetchItems();
     } catch (error) {
       console.error('Error deleting item:', error);
-      alert('Failed to delete item');
+      toast.error('Failed to delete item');
+    }
+  };
+
+  // Функция для отображения Stock
+  const renderStock = (stock: number) => {
+    if (stock === -1) {
+      return <span className="text-2xl text-blue-400">∞</span>;
+    } else if (stock === 0) {
+      return <span className="text-red-400 font-medium">Out of Stock</span>;
+    } else {
+      return <span className="text-white">{stock}</span>;
     }
   };
 
@@ -216,13 +236,14 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
                   <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.type')}</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.price')}</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.sellPrice')}</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Stock</th>
                   <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.lastModified')}</th>
                   <th className="px-6 py-4 text-right text-sm font-medium text-gray-400">{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 <AnimatePresence>
-                  {filteredItems.map((item, index) => (
+                  {(filteredItems || []).map((item, index) => (
                     <motion.tr
                       key={item.id}
                       initial={{ opacity: 0 }}
@@ -260,12 +281,15 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
                         <span
                           className="px-3 py-1 rounded-full text-sm font-medium capitalize"
                           style={{
-                            background: '#3b82f620',
-                            color: '#3b82f6',
+                            background: '#10b98120',
+                            color: '#10b981',
                           }}
                         >
                           {item.sell_price_eur} €
                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {renderStock(item.stock ?? -1)}
                       </td>
                       <td className="px-6 py-4 text-gray-400 text-sm">
                         {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'}

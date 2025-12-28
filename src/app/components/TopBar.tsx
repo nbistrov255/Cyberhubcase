@@ -86,6 +86,34 @@ export function TopBar({
   const [isTopBarVisible, setIsTopBarVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [stats, setStats] = useState({ casesOpened: 0, uniquePlayers: 0 });
+
+  // Загрузка статистики из API
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/stats/public');
+        
+        if (!response.ok) {
+          console.error('Failed to fetch stats');
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setStats({
+            casesOpened: data.stats?.total_spins || 0,
+            uniquePlayers: data.stats?.unique_users || 0,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   // Загрузка Live Feed из API
   useEffect(() => {
@@ -177,52 +205,64 @@ export function TopBar({
 
           {/* Right Side */}
           <div className="flex items-center gap-4">
-            {/* Topup Information - только для авторизованных */}
+            {/* Unified Balance & Stats - только для авторизованных */}
             {isAuthenticated && profile && (
-            <div className="flex items-center gap-2">
-              {/* Topup Today */}
-              <div className="flex items-center bg-[#3d5a2f] rounded-sm overflow-hidden border border-[#4a6738]/60 h-10">
-                <div className="h-10 w-10 flex items-center justify-center bg-[#4a6738]">
-                  <DollarSign className="w-4 h-4 text-[#8BC34A]" strokeWidth={2.5} />
-                </div>
-                <div className="px-3 flex flex-col items-start justify-center">
-                  <div className="text-sm font-bold text-white leading-tight">
-                    {profile.progress?.daily_topup_eur?.toFixed(2) || '0.00'} €
-                  </div>
-                  <div className="text-[9px] text-[#7a9960] uppercase tracking-wider leading-tight font-medium">
-                    Topup Today
-                  </div>
-                </div>
-              </div>
-              
-              {/* Topup Month */}
-              <div className="flex items-center bg-[#2d3f5a] rounded-sm overflow-hidden border border-[#3d5a7c]/60 h-10">
-                <div className="h-10 w-10 flex items-center justify-center bg-[#3d5a7c]">
-                  <Trophy className="w-4 h-4 text-[#6BA3FF]" strokeWidth={2.5} />
-                </div>
-                <div className="px-3 flex flex-col items-start justify-center">
-                  <div className="text-sm font-bold text-white leading-tight">
-                    {profile.progress?.monthly_topup_eur?.toFixed(2) || '0.00'} €
-                  </div>
-                  <div className="text-[9px] uppercase tracking-wider leading-tight font-medium" style={{color: '#7a9fcc'}}>
-                    Topup Month
+              <div className="flex items-center bg-[#2d5a3f] rounded-lg overflow-hidden border border-[#4a6738]/60">
+                {/* Main Balance Section */}
+                <div className="flex items-center px-3 py-2 gap-3 bg-[#3d5a2f]">
+                  <DollarSign className="w-5 h-5 text-[#8BC34A]" strokeWidth={2.5} />
+                  <div className="flex flex-col">
+                    <div className="text-xs text-[#7a9960] uppercase tracking-wider leading-tight font-medium">
+                      Balance
+                    </div>
+                    <div className="text-lg font-bold text-white leading-tight">
+                      {balance?.toFixed(2) || '0.00'} €
+                    </div>
                   </div>
                 </div>
+
+                {/* Divider */}
+                <div className="w-px h-10 bg-[#4a6738]/40"></div>
+
+                {/* Stats Section */}
+                <div className="flex items-center gap-3 px-3">
+                  {/* Today */}
+                  <div className="flex flex-col items-center">
+                    <div className="text-[9px] text-[#7a9960] uppercase tracking-wider leading-tight font-medium">
+                      Today
+                    </div>
+                    <div className="text-sm font-bold text-white leading-tight">
+                      {profile.progress?.daily_topup_eur?.toFixed(2) || '0.00'} €
+                    </div>
+                  </div>
+
+                  {/* Month */}
+                  <div className="flex flex-col items-center">
+                    <div className="text-[9px] text-[#7a9960] uppercase tracking-wider leading-tight font-medium">
+                      Month
+                    </div>
+                    <div className="text-sm font-bold text-white leading-tight">
+                      {profile.progress?.monthly_topup_eur?.toFixed(2) || '0.00'} €
+                    </div>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div className="w-px h-10 bg-[#4a6738]/40"></div>
+
+                {/* Refresh Button */}
                 <button 
-                  className="bg-[#3d5a7c] h-10 w-10 flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-50"
+                  className="px-3 h-full flex items-center justify-center hover:bg-[#4a6738]/30 transition-all disabled:opacity-50"
                   onClick={handleRefreshClick}
                   disabled={isRefreshing}
-                  style={{
-                    filter: 'drop-shadow(0 0 4px rgba(107, 163, 255, 0.15))'
-                  }}
+                  title="Refresh Balance"
                 >
                   <RotateCw 
-                    className={`w-4 h-4 text-[#6BA3FF] transition-transform duration-1000 ${isRefreshing ? 'animate-spin' : ''}`} 
+                    className={`w-4 h-4 text-[#8BC34A] transition-transform duration-1000 ${isRefreshing ? 'animate-spin' : ''}`} 
                     strokeWidth={2.5} 
                   />
                 </button>
               </div>
-            </div>
             )}
 
             {/* Settings */}
@@ -295,7 +335,7 @@ export function TopBar({
                     filter: 'brightness(0) saturate(100%) invert(82%) sepia(40%) saturate(628%) hue-rotate(335deg) brightness(103%) contrast(98%)'
                   }}
                 />
-                <span className="text-xl font-bold text-white leading-tight">47</span>
+                <span className="text-xl font-bold text-white leading-tight">{stats.casesOpened.toLocaleString()}</span>
                 <span className="text-[8px] text-gray-500 uppercase tracking-wider leading-tight">Cases Opened</span>
               </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Upload, Eye } from 'lucide-react';
+import { X, Upload } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 
 interface ItemFormModalProps {
@@ -19,6 +19,7 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
     image_url: '',
     price_eur: 0,
     sell_price_eur: 0,
+    stock: '',
     rarity: 'common' as 'common' | 'rare' | 'epic' | 'legendary' | 'mythic',
   });
 
@@ -30,6 +31,7 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
         image_url: editingItem.image_url || '',
         price_eur: editingItem.price_eur || 0,
         sell_price_eur: editingItem.sell_price_eur || 0,
+        stock: editingItem.stock === -1 ? '' : (editingItem.stock || '').toString(),
         rarity: editingItem.rarity || 'common',
       });
     } else {
@@ -39,6 +41,7 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
         image_url: '',
         price_eur: 0,
         sell_price_eur: 0,
+        stock: '',
         rarity: 'common',
       });
     }
@@ -46,7 +49,20 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSave(formData);
+    
+    // Логика для Stock: если пустое, отправляем -1 (бесконечно)
+    const stockValue = formData.stock === '' ? -1 : parseInt(formData.stock) || 0;
+    
+    // Логика для Sell Price: если не заполнено, равно price_eur
+    const sellPriceValue = formData.sell_price_eur || formData.price_eur;
+    
+    const submissionData = {
+      ...formData,
+      stock: stockValue,
+      sell_price_eur: sellPriceValue,
+    };
+    
+    onSave(submissionData);
   };
 
   return (
@@ -184,6 +200,8 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
                     color: '#ffffff',
                   }}
                   min="0"
+                  step="0.01"
+                  required
                 />
               </div>
 
@@ -191,6 +209,7 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-300 mb-2">
                   {t('itemForm.sellPriceEur')}
+                  <span className="text-xs text-gray-500 ml-2">(Leave empty to use Price EUR)</span>
                 </label>
                 <input
                   type="number"
@@ -203,7 +222,33 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
                     color: '#ffffff',
                   }}
                   min="0"
+                  step="0.01"
+                  placeholder={`Default: ${formData.price_eur} €`}
                 />
+              </div>
+
+              {/* Stock (Quantity) */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Quantity (Stock)
+                  <span className="text-xs text-gray-500 ml-2">(Leave empty for infinite ∞)</span>
+                </label>
+                <input
+                  type="number"
+                  value={formData.stock}
+                  onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                  className="w-full px-4 py-3 rounded-lg outline-none"
+                  style={{
+                    background: '#25252a',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#ffffff',
+                  }}
+                  min="0"
+                  placeholder="Leave empty for infinite (-1)"
+                />
+                {formData.stock === '' && (
+                  <p className="text-xs text-blue-400 mt-2">Stock will be set to infinite (∞)</p>
+                )}
               </div>
 
               {/* Rarity */}
@@ -246,6 +291,9 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
                       src={formData.image_url}
                       alt="Preview"
                       className="w-32 h-32 rounded-lg object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://via.placeholder.com/128?text=Invalid+URL';
+                      }}
                     />
                   </div>
                 </div>

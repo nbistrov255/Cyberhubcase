@@ -37,6 +37,34 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
   const [cases, setCases] = useState<CaseData[]>([]);
   const [loading, setLoading] = useState(true);
   const [bannerBackground, setBannerBackground] = useState('https://i.ibb.co/nqGS31TR/Chat-GPT-Image-24-2025-04-05-54.png');
+  const [stats, setStats] = useState({ casesOpened: 0, uniquePlayers: 0 });
+
+  // Загрузка статистики из API
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/stats/public');
+        
+        if (!response.ok) {
+          console.error('Failed to fetch stats');
+          return;
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          setStats({
+            casesOpened: data.stats?.total_spins || 0,
+            uniquePlayers: data.stats?.unique_users || 0,
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching stats:', error);
+      }
+    };
+
+    fetchStats();
+  }, []);
 
   // Загрузка настроек баннера из localStorage
   useEffect(() => {
@@ -618,7 +646,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
                         />
                       </div>
                       <div>
-                        <div className="text-3xl font-bold text-white font-mono">47</div>
+                        <div className="text-3xl font-bold text-white font-mono">{stats.casesOpened.toLocaleString()}</div>
                         <div className="text-xs text-gray-400 uppercase tracking-wider">Cases Opened</div>
                       </div>
                     </div>
@@ -641,8 +669,8 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
                         />
                       </div>
                       <div>
-                        <div className="text-3xl font-bold text-white font-mono">1,464</div>
-                        <div className="text-xs text-gray-400 uppercase tracking-wider">Players</div>
+                        <div className="text-3xl font-bold text-white font-mono">{stats.uniquePlayers.toLocaleString()}</div>
+                        <div className="text-xs text-gray-400 uppercase tracking-wider">Unique Players</div>
                       </div>
                     </div>
                   </div>
