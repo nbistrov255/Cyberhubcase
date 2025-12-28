@@ -4,6 +4,23 @@ Quick navigation for all CyberHub documentation files.
 
 ---
 
+## 🚀 Quick Start (Choose Your Path)
+
+### 🎮 I want to run the project now!
+- **[ПОШАГОВАЯ_ИНСТРУКЦИЯ.md](./ПОШАГОВАЯ_ИНСТРУКЦИЯ.md)** 🇷🇺 - Пошаговое руководство (русский)
+- **[QUICK_START.md](./QUICK_START.md)** 🇬🇧 - Quick start guide (English)
+
+### 🎨 Styles not loading (white screen)?
+- **[РЕШЕНИЕ_БЕЛОГО_ЭКРАНА.md](./РЕШЕНИЕ_БЕЛОГО_ЭКРАНА.md)** 🇷🇺 - Решение проблемы
+- **[TROUBLESHOOTING_STYLES.md](./TROUBLESHOOTING_STYLES.md)** 🇬🇧 - Fix styling issues
+
+### ⚙️ I need to understand the configuration
+- **[VITE_CONFIG_REFERENCE.md](./VITE_CONFIG_REFERENCE.md)** - Vite + Tailwind v4 config
+- **[TAILWIND_V3_VS_V4.md](./TAILWIND_V3_VS_V4.md)** - Tailwind versions explained
+- **[CONFIG_UPDATE_SUMMARY.md](./CONFIG_UPDATE_SUMMARY.md)** - Latest config updates
+
+---
+
 ## 🎯 For Backend Developers (AI/Human)
 
 **If you're implementing the backend API, read in this order:**

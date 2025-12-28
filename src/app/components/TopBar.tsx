@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Settings, User, DollarSign, Trophy, Box, RotateCw, Crown, Zap, Users, Circle, Diamond, Star, Flame } from 'lucide-react';
 import { LiveFeedItem } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
+import { useAuth } from '../contexts/AuthContext';
 
 // Заменено figma:asset импорт на прямую ссылку
 const knifeImage = "https://i.ibb.co/cXCCBcfV/unnamed.png";
@@ -246,6 +247,7 @@ export function TopBar({
   onLogoClick,
   onBalanceRefresh,
 }: TopBarProps) {
+  const { profile } = useAuth(); // Получаем профиль из контекста
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [feedItems, setFeedItems] = useState<LiveFeedItem[]>(mockLiveFeed);
   const [activeFilter, setActiveFilter] = useState<'all' | 'top'>('all');
@@ -316,34 +318,51 @@ export function TopBar({
 
           {/* Right Side */}
           <div className="flex items-center gap-4">
-            {/* Balance - KeyDrop Style - только для авторизованных */}
-            {isAuthenticated && (
-            <div className="flex items-center bg-[#3d5a2f] rounded-sm overflow-hidden border border-[#4a6738]/60 h-10">
-              {/* Left Icon Zone - Slightly Lighter Green Square */}
-              <div className="h-10 w-10 flex items-center justify-center bg-[#4a6738]">
-                <DollarSign className="w-4 h-4 text-[#8BC34A]" strokeWidth={2.5} />
+            {/* Topup Information - только для авторизованных */}
+            {isAuthenticated && profile && (
+            <div className="flex items-center gap-2">
+              {/* Topup Today */}
+              <div className="flex items-center bg-[#3d5a2f] rounded-sm overflow-hidden border border-[#4a6738]/60 h-10">
+                <div className="h-10 w-10 flex items-center justify-center bg-[#4a6738]">
+                  <DollarSign className="w-4 h-4 text-[#8BC34A]" strokeWidth={2.5} />
+                </div>
+                <div className="px-3 flex flex-col items-start justify-center">
+                  <div className="text-sm font-bold text-white leading-tight">
+                    {profile.progress?.daily_topup_eur?.toFixed(2) || '0.00'} €
+                  </div>
+                  <div className="text-[9px] text-[#7a9960] uppercase tracking-wider leading-tight font-medium">
+                    Topup Today
+                  </div>
+                </div>
               </div>
               
-              {/* Text Zone */}
-              <div className="px-3 flex flex-col items-start justify-center">
-                <div className="text-sm font-bold text-white leading-tight">{balance.toFixed(2)} $</div>
-                <div className="text-[9px] text-[#7a9960] uppercase tracking-wider leading-tight font-medium">Баланс Кошелька</div>
+              {/* Topup Month */}
+              <div className="flex items-center bg-[#2d3f5a] rounded-sm overflow-hidden border border-[#3d5a7c]/60 h-10">
+                <div className="h-10 w-10 flex items-center justify-center bg-[#3d5a7c]">
+                  <Trophy className="w-4 h-4 text-[#6BA3FF]" strokeWidth={2.5} />
+                </div>
+                <div className="px-3 flex flex-col items-start justify-center">
+                  <div className="text-sm font-bold text-white leading-tight">
+                    {profile.progress?.monthly_topup_eur?.toFixed(2) || '0.00'} €
+                  </div>
+                  <div className="text-[9px] uppercase tracking-wider leading-tight font-medium" style={{color: '#7a9fcc'}}>
+                    Topup Month
+                  </div>
+                </div>
+                <button 
+                  className="bg-[#3d5a7c] h-10 w-10 flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-50"
+                  onClick={handleRefreshClick}
+                  disabled={isRefreshing}
+                  style={{
+                    filter: 'drop-shadow(0 0 4px rgba(107, 163, 255, 0.15))'
+                  }}
+                >
+                  <RotateCw 
+                    className={`w-4 h-4 text-[#6BA3FF] transition-transform duration-1000 ${isRefreshing ? 'animate-spin' : ''}`} 
+                    strokeWidth={2.5} 
+                  />
+                </button>
               </div>
-              
-              {/* Right Action Zone - Slightly Lighter Green Square */}
-              <button 
-                className="bg-[#4a6738] h-10 w-10 flex items-center justify-center hover:brightness-110 transition-all disabled:opacity-50"
-                onClick={handleRefreshClick}
-                disabled={isRefreshing}
-                style={{
-                  filter: 'drop-shadow(0 0 4px rgba(139, 195, 74, 0.15))'
-                }}
-              >
-                <RotateCw 
-                  className={`w-4 h-4 text-[#8BC34A] transition-transform duration-1000 ${isRefreshing ? 'animate-spin' : ''}`} 
-                  strokeWidth={2.5} 
-                />
-              </button>
             </div>
             )}
 

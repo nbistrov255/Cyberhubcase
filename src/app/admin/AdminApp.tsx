@@ -36,8 +36,9 @@ export default function AdminApp() {
   const [adminLanguage, setAdminLanguage] = useState<'en' | 'ru' | 'lv'>('en');
 
   const handleLogin = (username: string, password: string) => {
-    // Mock login - in real app this would be API call
-    if (username && password) {
+    // Временно отключена проверка пароля для настройки админки
+    // TODO: Включить обратно когда будет система ролей в БД
+    if (username) {
       setCurrentUser({
         id: '1',
         username,

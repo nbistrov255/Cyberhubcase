@@ -20,7 +20,10 @@ CyberHub is a full-featured case opening platform with a Counter-Strike aestheti
 
 ### Quick Start Guides
 - **[QUICK_START.md](./QUICK_START.md)** - How to run the project locally 🚀
+- **[ПОШАГОВАЯ_ИНСТРУКЦИЯ.md](./ПОШАГОВАЯ_ИНСТРУКЦИЯ.md)** - Пошаговое руководство на русском 🇷🇺
 - **[TROUBLESHOOTING_STYLES.md](./TROUBLESHOOTING_STYLES.md)** - Fix styling issues 🎨
+- **[VITE_CONFIG_REFERENCE.md](./VITE_CONFIG_REFERENCE.md)** - Vite configuration reference ⚙️
+- **[TAILWIND_V3_VS_V4.md](./TAILWIND_V3_VS_V4.md)** - Tailwind v3 vs v4 differences 📖
 - **[DOCS_INDEX.md](./DOCS_INDEX.md)** - Complete documentation navigation 📑
 - **[HOW_TO_EXPORT.md](./HOW_TO_EXPORT.md)** - How to export and run the project
 - **[DOWNLOAD_INSTRUCTIONS.md](./DOWNLOAD_INSTRUCTIONS.md)** - Download and setup instructions
