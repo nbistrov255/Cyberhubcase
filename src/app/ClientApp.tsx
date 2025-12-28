@@ -195,8 +195,6 @@ function ClientAppContent() {
         )}
         {currentPage === 'inventory' && (
           <InventoryPage
-            items={inventory}
-            onAction={handleInventoryAction}
             onBack={() => setCurrentPage('cases')}
           />
         )}

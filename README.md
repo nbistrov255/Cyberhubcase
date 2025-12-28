@@ -1,329 +1,273 @@
-# 🎮 CyberHub - Case Opening Platform
+# CyberHub - Case Opening Platform
 
-Полноценная платформа для открытия кейсов с интеграцией SmartShell API.
+## 🎮 Project Overview
 
----
+CyberHub is a full-featured case opening platform with a Counter-Strike aesthetic, consisting of:
 
-## 📦 Состав проекта
+1. **Client Application** - Desktop-style Windows app for users to open cases and manage inventory
+2. **Admin Panel** - Web-based dashboard for managing items, cases, users, and system settings
 
-### 1️⃣ **Клиентское приложение** (Desktop Windows .exe)
-Десктопное приложение для клиентов компьютерных клубов.
-
-**Функционал:**
-- ✅ Открытие кейсов с анимацией рулетки
-- ✅ Система инвентаря
-- ✅ Профили игроков
-- ✅ Лента живых дропов
-- ✅ Мультиязычность (EN/RU/LV)
-- ✅ Игровой дизайн в стиле Counter-Strike
-
-### 2️⃣ **Админ-панель** (Web сайт)
-Веб-панель управления для персонала.
-
-**Функционал:**
-- ✅ Управление кейсами и предметами
-- ✅ Система заявок на выдачу призов
-- ✅ Управление пользователями
-- ✅ Логи и аудит действий
-- ✅ Ролевая система (Owner/Admin/Moderator)
-- ✅ Мультиязычность (EN/RU/LV)
+### Technology Stack
+- **Frontend**: React 18 + TypeScript + Vite
+- **Styling**: Tailwind CSS v4.0
+- **Animations**: Motion (Framer Motion)
+- **Backend API**: http://91.107.120.48:3000
+- **Languages**: English, Russian, Latvian
 
 ---
 
-## 🚀 Быстрый старт
+## 📚 Documentation
 
-### Установка зависимостей
+### Quick Start Guides
+- **[DOCS_INDEX.md](./DOCS_INDEX.md)** - Complete documentation navigation 📑
+- **[HOW_TO_EXPORT.md](./HOW_TO_EXPORT.md)** - How to export and run the project
+- **[DOWNLOAD_INSTRUCTIONS.md](./DOWNLOAD_INSTRUCTIONS.md)** - Download and setup instructions
+- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Production deployment guide
+
+### Admin Panel
+- **[ADMIN_README.md](./ADMIN_README.md)** - Complete admin panel documentation
+
+### Backend Integration (For Backend Developers)
+- **[BACKEND_INTEGRATION_CHECKLIST.md](./BACKEND_INTEGRATION_CHECKLIST.md)** - Quick checklist ⭐ **START HERE**
+- **[FRONTEND_CHANGELOG.md](./FRONTEND_CHANGELOG.md)** - Complete technical specs 📖
+- **[API_EXAMPLES.md](./API_EXAMPLES.md)** - Copy-paste ready examples 💻
+- **[INTEGRATION_TESTS.md](./INTEGRATION_TESTS.md)** - Testing procedures 🧪
+
+### Credits
+- **[ATTRIBUTIONS.md](./ATTRIBUTIONS.md)** - Third-party libraries and assets
+
+---
+
+## 🚀 Quick Start
+
+### Development Mode
 
 ```bash
+# Install dependencies
 npm install
+
+# Run client application (default)
+npm run dev
+
+# Run admin panel
+npm run dev:admin
 ```
 
-### Запуск в режиме разработки
+### Build for Production
 
 ```bash
-npm run dev
-```
+# Build client application
+npm run build
 
-Откроется на `http://localhost:5173`
-
-> ⚠️ **Важно**: Проект готов к запуску без ручных правок. Все импорты `figma:asset` заменены на прямые URL.
-
-### Переключение между клиентом и админкой
-
-**Сейчас активно:** Клиентское приложение
-
-**Переключиться на админ-панель:**
-
-Откройте `/src/app/App.tsx` и замените на:
-
-```tsx
-import AdminAppEntry from './AdminAppEntry';
-
-export default function App() {
-  return <AdminAppEntry />;
-}
-```
-
-**Вход в админку:**
-- Username: `admin`
-- Password: `admin123`
-
-**Вернуться к клиенту:**
-
-```tsx
-import ClientApp from './ClientApp';
-
-export default function App() {
-  return <ClientApp />;
-}
+# Build admin panel
+npm run build:admin
 ```
 
 ---
 
-## 📖 Документация
+## 🎯 Key Features
 
-- **[DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)** - Полное руководство по деплою
-  - Как сделать .exe из клиента (Electron/Tauri)
-  - Как задеплоить админку на веб
-  - Интеграция SmartShell API
-  - Передача проекта разработчику
+### Client Application
+- ✅ Multi-language support (EN/RU/LV)
+- ✅ Live drop feed animation
+- ✅ Case opening with roulette animation
+- ✅ Inventory management with sell functionality
+- ✅ User profiles and statistics
+- ✅ Event cases with countdown timers
+- ✅ Maintenance mode support
+- ✅ Full API integration
 
-- **[ADMIN_README.md](./ADMIN_README.md)** - Описание админ-панели
-  - Функционал всех страниц
-  - Ролевая система
-  - Структура компонентов
-
-- **[SWITCH_TO_ADMIN.md](./SWITCH_TO_ADMIN.md)** - Как переключаться между приложениями
+### Admin Panel
+- ✅ Dashboard with real-time statistics
+- ✅ Items management (create, edit, delete)
+- ✅ Cases management with drag-drop item assignment
+- ✅ Event cases with automatic date calculation
+- ✅ User management and permissions
+- ✅ Claim requests handling
+- ✅ Logs and monitoring
+- ✅ Multi-language interface
+- ✅ Role-based access control (Owner, Admin, Moderator)
+- ✅ Maintenance mode toggle
 
 ---
 
-## 🏗️ Структура проекта
+## 🔧 API Integration Status
+
+### Implemented Endpoints
+
+#### Authentication
+- ✅ `POST /api/auth/login` - User login
+
+#### Admin - Items
+- ✅ `GET /api/admin/items` - Fetch all items
+- ✅ `POST /api/admin/items` - Create item
+- ✅ `PUT /api/admin/items/:id` - Update item
+- ✅ `DELETE /api/admin/items/:id` - Delete item
+
+#### Client - Inventory
+- ✅ `GET /api/inventory` - Fetch user inventory
+- ✅ `POST /api/inventory/sell` - Sell inventory item
+
+#### User Profile
+- ✅ `GET /api/profile` - Get user profile
+- ✅ `PUT /api/profile` - Update profile
+
+#### Case Opening
+- ✅ `POST /api/cases/open` - Open a case
+
+### Pending Backend Implementation
+- ⏳ `GET /api/cases` - Fetch all cases
+- ⏳ `POST /api/admin/cases` - Create case
+- ⏳ `PUT /api/admin/cases/:id` - Update case
+- ⏳ `DELETE /api/admin/cases/:id` - Delete case
+
+---
+
+## 📁 Project Structure
 
 ```
-cyberhub-project/
+/
 ├── src/
 │   ├── app/
-│   │   ├── App.tsx                    # Точка входа (CLIENT по умолчанию)
-│   │   ├── AdminAppEntry.tsx          # Точка входа для ADMIN
-│   │   ├── ClientApp.tsx              # Клиентское приложение
-│   │   │
-│   │   ├── admin/                     # АДМИН-ПАНЕЛЬ
-│   │   │   ├── AdminApp.tsx
-│   │   │   ├── components/
-│   │   │   ├── contexts/
-│   │   │   └── pages/
-│   │   │       ├── LoginPage.tsx
-│   │   │       ├── DashboardPage.tsx
-│   │   │       ├── CasesPage.tsx
-│   │   │       ├── ItemsPage.tsx
-│   │   │       ├── RequestsPage.tsx
-│   │   │       ├── ProblemQueuePage.tsx
-│   │   │       ├── UsersPage.tsx
-│   │   │       ├── LogsPage.tsx
-│   │   │       └── SettingsPage.tsx
-│   │   │
-│   │   ├── components/                # КЛИЕНТСКИЕ КОМПОНЕНТЫ
-│   │   │   ├── CasesPage.tsx
-│   │   │   ├── CaseOpenPage.tsx
-│   │   │   ├── CaseOpening.tsx
-│   │   │   ├── WinPage.tsx
-│   │   │   ├── InventoryPage.tsx
-│   │   │   ├── PlayerProfile.tsx
-│   │   │   ├── TopBar.tsx
-│   │   │   └── ui/                    # UI компоненты (shadcn)
-│   │   │
-│   │   └── contexts/
-│   │       └── LanguageContext.tsx    # Клиентская локализация
-│   │
-│   └── styles/
-│       ├── index.css
-│       ├── tailwind.css
-│       ├── theme.css                  # Цветовая схема
-│       └── fonts.css
+│   │   ├── admin/              # Admin panel
+│   │   │   ├── components/     # Admin components
+│   │   │   ├── contexts/       # Admin contexts
+│   │   │   └── pages/          # Admin pages
+│   │   ├── components/         # Client components
+│   │   ├── contexts/           # Client contexts
+│   │   ├── AdminApp.tsx        # Admin app entry
+│   │   └── ClientApp.tsx       # Client app entry
+│   ├── config/                 # API configuration
+│   ├── styles/                 # Global styles
+│   └── main.tsx                # App entry point
 │
-├── package.json
-├── vite.config.ts
-├── README.md                          # Этот файл
-├── DEPLOYMENT_GUIDE.md                # Гайд по деплою
-├── ADMIN_README.md                    # Описание админки
-└── SWITCH_TO_ADMIN.md                 # Переключение
+├── FRONTEND_CHANGELOG.md       # API integration docs
+├── API_EXAMPLES.md             # Request/response examples
+├── INTEGRATION_TESTS.md        # Testing guide
+├── ADMIN_README.md             # Admin panel guide
+├── DEPLOYMENT_GUIDE.md         # Deployment instructions
+└── package.json
 ```
 
 ---
 
-## 🎨 Дизайн-система
+## 🎨 Design System
 
-### Цвета
+### Colors
+- **Background**: `#17171c` (Dark)
+- **Accent**: `#7c2d3a` (Burgundy)
+- **Cards**: `#1d1d22`
+- **Borders**: `rgba(255, 255, 255, 0.1)`
 
-```css
---background: #17171c;       /* Основной фон */
---card: #1d1d22;            /* Фон карточек */
---accent: #7c2d3a;          /* Акцент (бордовый) */
---accent-hover: #9a3b4a;    /* Акцент при hover */
+### Typography
+Custom typography setup in `/src/styles/theme.css` - do not override with Tailwind classes unless requested.
+
+### Rarity Colors
+- **Common**: `#9ca3af` (Gray)
+- **Rare**: `#3b82f6` (Blue)
+- **Epic**: `#8b5cf6` (Purple)
+- **Legendary**: `#f59e0b` (Gold)
+- **Mythic**: `#ef4444` (Red)
+
+---
+
+## 🔐 Environment Variables
+
+Currently using hardcoded API URL. For production, create `.env`:
+
+```env
+VITE_API_BASE_URL=http://91.107.120.48:3000
 ```
 
-### Редкость предметов
+---
 
-```css
---rarity-common: #9ca3af;    /* Серый */
---rarity-rare: #3b82f6;      /* Синий */
---rarity-epic: #8b5cf6;      /* Фиолетовый */
---rarity-legendary: #f59e0b; /* Золотой */
---rarity-mythic: #ef4444;    /* Красный */
+## 🐛 Known Issues
+
+None currently. See [INTEGRATION_TESTS.md](./INTEGRATION_TESTS.md) for testing checklist.
+
+---
+
+## 📝 Development Notes
+
+### Switching Between Client and Admin
+
+Edit `/src/main.tsx`:
+```typescript
+// For client app
+root.render(<App />);
+
+// For admin panel
+root.render(<AdminAppEntry />);
 ```
 
----
-
-## 🔧 Технологии
-
-- **React 18** + TypeScript
-- **Tailwind CSS 4.0**
-- **Motion** (Framer Motion) - анимации
-- **Lucide React** - иконки
-- **Vite** - сборщик
-- **Context API** - управление состоянием
-- **localStorage** - персистентность данных
-
----
-
-## 📋 Разделение на два проекта
-
-Для деплоя нужно разделить на:
-
-### `cyberhub-client/` (Desktop .exe)
-- Скопировать всё кроме `/src/app/admin/`
-- `/src/app/App.tsx` → `import ClientApp`
-- Добавить Electron/Tauri
-- Собрать .exe для Windows
-
-### `cyberhub-admin/` (Web)
-- Скопировать только `/src/app/admin/` + UI компоненты
-- `/src/app/App.tsx` → `import AdminAppEntry`
-- Собрать для веба (`npm run build`)
-- Задеплоить на домен
-
-**Подробнее:** См. [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
-
----
-
-## 🔗 Следующие шаги (Backend)
-
-### Что нужно добавить:
-
-1. **Backend API** (Node.js/Python/PHP/Go)
-   - REST API для клиента
-   - REST API для админки
-   - Аутентификация
-
-2. **База данных** (PostgreSQL/MySQL/MongoDB)
-   - Пользователи
-   - Кейсы и предметы
-   - Инвентарь
-   - Заявки на призы
-   - Логи
-
-3. **SmartShell API Integration**
-   - Авторизация пользователей
-   - Получение баланса
-   - Списание/начисление средств
-   - Webhook события
-
-4. **Деплой**
-   - Клиент → .exe установщик для Windows
-   - Админка → веб-сервер (nginx/apache)
-   - Backend → API сервер
-   - База данных
-
----
-
-## 📦 Как передать проект
-
-### Вариант 1: ZIP архив
-
+Or use npm scripts:
 ```bash
-# Создать архив (без node_modules)
-zip -r cyberhub-project.zip . -x "node_modules/*" "dist/*"
+npm run dev        # Client
+npm run dev:admin  # Admin
 ```
 
-### Вариант 2: Git репозиторий
+### Adding New API Endpoints
 
+1. Check [FRONTEND_CHANGELOG.md](./FRONTEND_CHANGELOG.md) for data structures
+2. See [API_EXAMPLES.md](./API_EXAMPLES.md) for request formats
+3. Test with [INTEGRATION_TESTS.md](./INTEGRATION_TESTS.md)
+
+### Adding Translations
+
+- **Client**: `/src/app/contexts/LanguageContext.tsx`
+- **Admin**: `/src/app/admin/contexts/AdminLanguageContext.tsx`
+
+Add keys in all 3 languages: `en`, `ru`, `lv`
+
+---
+
+## 🤝 For Backend Developers
+
+**Start here**: [FRONTEND_CHANGELOG.md](./FRONTEND_CHANGELOG.md)
+
+This document contains:
+- Complete list of API endpoints frontend expects
+- Request/response JSON structures
+- Required fields and validations
+- Database schema implications
+
+Then check:
+- [API_EXAMPLES.md](./API_EXAMPLES.md) - Copy-paste ready examples
+- [INTEGRATION_TESTS.md](./INTEGRATION_TESTS.md) - How to test integration
+
+---
+
+## 📦 Building for Production
+
+### Client Application (Desktop)
 ```bash
-git init
-git add .
-git commit -m "Initial commit: CyberHub platform"
-git remote add origin <your-repo-url>
-git push -u origin main
+npm run build
+# Output: /dist folder
+# Deploy as desktop app or web app
 ```
 
-### Вариант 3: Отправить ChatGPT
+### Admin Panel (Web)
+```bash
+npm run build:admin
+# Output: /dist-admin folder
+# Deploy to web hosting with custom domain
+```
 
-Скопируйте содержимое ключевых файлов:
-- `/src/app/ClientApp.tsx`
-- `/src/app/admin/AdminApp.tsx`
-- `/src/styles/theme.css`
-- `package.json`
-
-И отправьте вместе с описанием из [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
-
----
-
-## 🐛 Известные моменты
-
-- **Mock данные**: Все данные сейчас хранятся в localStorage
-- **Нет реального API**: Нужно подключить SmartShell API
-- **Нет авторизации**: Логин админа - это mock
-- **Открытие кейсов**: Работает локально, нужен backend для честной генерации
-- **Инвентарь**: Локальный, нужна синхронизация с сервером
+See [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md) for detailed instructions.
 
 ---
 
-## 📞 Поддержка
+## 📄 License
 
-Вопросы по проекту:
-- Изучите [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)
-- Проверьте [ADMIN_README.md](./ADMIN_README.md)
-- Посмотрите комментарии в коде
+Proprietary - CyberHub Platform
 
 ---
 
-## 📄 Лицензия
+## 📞 Support
 
-Проект создан для CyberHub.
+For technical questions:
+- Review documentation in this repository
+- Check API integration guides
+- See testing checklists
 
-**Версия**: 1.0.0  
-**Дата**: Декабрь 2024  
-
----
-
-## ✅ Чек-лист функционала
-
-### Клиент
-- [x] Главная страница с кейсами
-- [x] Анимация открытия кейса (рулетка)
-- [x] Экран выигрыша
-- [x] Инвентарь
-- [x] Профили игроков
-- [x] Лента живых дропов
-- [x] Модальное окно настроек
-- [x] Мультиязычность (EN/RU/LV)
-- [ ] Интеграция SmartShell API
-- [ ] Desktop .exe сборка
-
-### Админ-панель
-- [x] Страница входа
-- [x] Dashboard со статистикой
-- [x] Управление предметами
-- [x] Управление кейсами
-- [x] Система заявок
-- [x] Очередь проблем
-- [x] Управление пользователями
-- [x] Логи и аудит
-- [x] Настройки системы
-- [x] Ролевая система
-- [x] Мультиязычность (EN/RU/LV)
-- [ ] Backend API
-- [ ] Web деплой
-
----
-
-**Готово к передаче разработчику backend!** 🚀
+**Last Updated**: December 28, 2024

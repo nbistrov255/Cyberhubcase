@@ -6,16 +6,13 @@ import { UserRole } from '../AdminApp';
 import { ItemFormModal } from '../components/ItemFormModal';
 
 interface Item {
-  id: string;
-  nameLv: string;
-  nameRu: string;
-  nameEn: string;
-  type: 'physical' | 'balance' | 'virtual';
-  rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
-  image: string;
-  stock: number;
-  isActive: boolean;
-  lastModified: Date;
+  id: number;
+  type: 'skin' | 'physical' | 'money';
+  title: string;
+  image_url: string;
+  price_eur: number;
+  sell_price_eur: number;
+  created_at?: string;
 }
 
 interface ItemsPageProps {
@@ -25,7 +22,7 @@ interface ItemsPageProps {
 export function ItemsPage({ userRole }: ItemsPageProps) {
   const { t, language } = useAdminLanguage();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'physical' | 'balance' | 'virtual'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'skin' | 'physical' | 'money'>('all');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState<Item | null>(null);
   const [items, setItems] = useState<Item[]>([]);
@@ -39,17 +36,14 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const response = await fetch('http://localhost:3000/api/admin/items');
+      const response = await fetch('http://91.107.120.48:3000/api/admin/items');
       
       if (!response.ok) {
         throw new Error('Failed to fetch items');
       }
 
       const data = await response.json();
-      setItems(data.map((item: any) => ({
-        ...item,
-        lastModified: new Date(item.lastModified || item.updatedAt || Date.now()),
-      })));
+      setItems(data);
     } catch (error) {
       console.error('Error fetching items:', error);
     } finally {
@@ -57,39 +51,25 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
     }
   };
 
-  const rarityColors = {
-    common: '#9ca3af',
-    rare: '#3b82f6',
-    epic: '#8b5cf6',
-    legendary: '#f59e0b',
-    mythic: '#ef4444',
-  };
-
   const canEdit = ['owner', 'admin'].includes(userRole);
 
   const filteredItems = items.filter((item) => {
-    const matchesSearch = 
-      item.nameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.nameRu.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.nameLv.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = item.title.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterType === 'all' || item.type === filterType;
     return matchesSearch && matchesFilter;
   });
 
-  const getItemName = (item: Item) => {
-    if (language === 'lv') return item.nameLv;
-    if (language === 'ru') return item.nameRu;
-    return item.nameEn;
-  };
-
   const handleSaveItem = async (itemData: any) => {
     try {
+      const token = localStorage.getItem('session_token');
+      
       if (editingItem) {
         // Обновление существующего предмета
-        const response = await fetch(`http://localhost:3000/api/admin/items/${editingItem.id}`, {
+        const response = await fetch(`http://91.107.120.48:3000/api/admin/items/${editingItem.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify(itemData),
         });
@@ -97,15 +77,13 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
         if (!response.ok) {
           throw new Error('Failed to update item');
         }
-
-        const updatedItem = await response.json();
-        setItems(items.map(item => item.id === editingItem.id ? { ...updatedItem, lastModified: new Date(updatedItem.lastModified || updatedItem.updatedAt) } : item));
       } else {
         // Создание нового предмета
-        const response = await fetch('http://localhost:3000/api/admin/items', {
+        const response = await fetch('http://91.107.120.48:3000/api/admin/items', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify(itemData),
         });
@@ -113,37 +91,38 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
         if (!response.ok) {
           throw new Error('Failed to create item');
         }
-
-        const newItem = await response.json();
-        setItems([...items, { ...newItem, lastModified: new Date(newItem.lastModified || newItem.createdAt) }]);
       }
-      
+
+      // Перезагрузка списка
+      await fetchItems();
       setShowModal(false);
       setEditingItem(null);
     } catch (error) {
       console.error('Error saving item:', error);
-      alert('Failed to save item. Please try again.');
+      alert('Failed to save item');
     }
   };
 
-  const handleDeleteItem = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) {
-      return;
-    }
+  const handleDeleteItem = async (id: number) => {
+    if (!confirm(t('items.deleteConfirm'))) return;
 
     try {
-      const response = await fetch(`http://localhost:3000/api/admin/items/${id}`, {
+      const token = localStorage.getItem('session_token');
+      const response = await fetch(`http://91.107.120.48:3000/api/admin/items/${id}`, {
         method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
       });
 
       if (!response.ok) {
         throw new Error('Failed to delete item');
       }
 
-      setItems(items.filter(item => item.id !== id));
+      await fetchItems();
     } catch (error) {
       console.error('Error deleting item:', error);
-      alert('Failed to delete item. Please try again.');
+      alert('Failed to delete item');
     }
   };
 
@@ -196,7 +175,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
 
         {/* Type Filter */}
         <div className="flex gap-2">
-          {(['all', 'physical', 'balance', 'virtual'] as const).map((type) => (
+          {(['all', 'skin', 'physical', 'money'] as const).map((type) => (
             <button
               key={type}
               onClick={() => setFilterType(type)}
@@ -227,9 +206,8 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
               <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Image</th>
               <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.name')}</th>
               <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.type')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.rarity')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.stock')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.status')}</th>
+              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.price')}</th>
+              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.sellPrice')}</th>
               <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.lastModified')}</th>
               <th className="px-6 py-4 text-right text-sm font-medium text-gray-400">{t('common.actions')}</th>
             </tr>
@@ -248,13 +226,13 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
                 >
                   <td className="px-6 py-4">
                     <img
-                      src={item.image}
-                      alt={getItemName(item)}
+                      src={item.image_url}
+                      alt={item.title}
                       className="w-12 h-12 rounded-lg object-cover"
                     />
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-white font-medium">{getItemName(item)}</p>
+                    <p className="text-white font-medium">{item.title}</p>
                   </td>
                   <td className="px-6 py-4">
                     <span className="text-gray-300 capitalize">{t(`items.type${item.type.charAt(0).toUpperCase() + item.type.slice(1)}` as any)}</span>
@@ -263,35 +241,26 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
                     <span
                       className="px-3 py-1 rounded-full text-sm font-medium capitalize"
                       style={{
-                        background: `${rarityColors[item.rarity]}20`,
-                        color: rarityColors[item.rarity],
+                        background: '#3b82f620',
+                        color: '#3b82f6',
                       }}
                     >
-                      {item.rarity}
+                      {item.price_eur} €
                     </span>
                   </td>
                   <td className="px-6 py-4">
                     <span
-                      className={`font-medium ${
-                        item.stock === 0 ? 'text-red-400' : item.stock < 10 ? 'text-yellow-400' : 'text-green-400'
-                      }`}
-                    >
-                      {item.type === 'balance' ? '∞' : item.stock}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className="px-3 py-1 rounded-full text-sm font-medium"
+                      className="px-3 py-1 rounded-full text-sm font-medium capitalize"
                       style={{
-                        background: item.isActive ? '#10b98120' : '#6b728020',
-                        color: item.isActive ? '#10b981' : '#6b7280',
+                        background: '#3b82f620',
+                        color: '#3b82f6',
                       }}
                     >
-                      {item.isActive ? t('items.active') : t('items.hidden')}
+                      {item.sell_price_eur} €
                     </span>
                   </td>
                   <td className="px-6 py-4 text-gray-400 text-sm">
-                    {item.lastModified.toLocaleDateString()}
+                    {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-2">
