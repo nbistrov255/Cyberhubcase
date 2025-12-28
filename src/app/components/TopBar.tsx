@@ -149,7 +149,7 @@ export function TopBar({
     
     setIsRefreshing(true);
     
-    // Вызываем функцию обновления баланса
+    // Вызываем функцию обновления баланса (БЕЗ toast.success)
     if (onBalanceRefresh) {
       onBalanceRefresh();
     }

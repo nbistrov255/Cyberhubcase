@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Eye, Check, X, RotateCcw } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
+import { toast } from 'sonner';
 
 interface Request {
   id: string;
@@ -31,45 +32,60 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
   const { t } = useAdminLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | Request['status']>('all');
+  const [requests, setRequests] = useState<Request[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [requests, setRequests] = useState<Request[]>([
-    {
-      id: '1',
-      requestId: 'REQ-2024-001',
-      user: {
-        nickname: 'PlayerOne',
-        phone: '+371 2000 0000',
-        uuid: 'uuid-12345',
-      },
-      item: {
-        name: 'AK-47 | Redline',
-        image: 'https://images.unsplash.com/photo-1625527575307-616f0bb84ad2?w=100&h=100&fit=crop',
-        rarity: 'legendary',
-      },
-      case: 'Daily Gold Case',
-      pc: 'PC-001',
-      date: new Date('2024-12-24'),
-      status: 'pending',
-    },
-    {
-      id: '2',
-      requestId: 'REQ-2024-002',
-      user: {
-        nickname: 'GamerPro',
-        phone: '+371 2111 1111',
-        uuid: 'uuid-67890',
-      },
-      item: {
-        name: 'Gaming Headset Pro',
-        image: 'https://images.unsplash.com/photo-1599669454699-248893623440?w=100&h=100&fit=crop',
-        rarity: 'epic',
-      },
-      case: 'Premium Monthly',
-      pc: 'PC-002',
-      date: new Date('2024-12-23'),
-      status: 'approved',
-    },
-  ]);
+  // Загрузка заявок из API
+  useEffect(() => {
+    fetchRequests();
+  }, []);
+
+  const fetchRequests = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch('/api/admin/requests', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch requests');
+      }
+
+      const data = await response.json();
+      
+      // Преобразуем данные из API в формат компонента
+      const formattedRequests = (data || []).map((req: any) => ({
+        id: req.id,
+        requestId: req.request_id || `REQ-${req.id}`,
+        user: {
+          nickname: req.user_nickname || 'Unknown',
+          phone: req.user_phone || 'N/A',
+          uuid: req.user_uuid || '',
+        },
+        item: {
+          name: req.item_name || 'Unknown Item',
+          image: req.item_image || 'https://via.placeholder.com/100',
+          rarity: req.item_rarity || 'common',
+        },
+        case: req.case_name || 'Unknown Case',
+        pc: req.pc_id || 'N/A',
+        date: req.created_at ? new Date(req.created_at) : new Date(),
+        status: req.status || 'pending',
+      }));
+
+      setRequests(formattedRequests);
+    } catch (error) {
+      console.error('Error fetching requests:', error);
+      toast.error('Failed to load requests');
+      setRequests([]); // Устанавливаем пустой массив при ошибке
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const rarityColors = {
     common: '#9ca3af',
@@ -79,255 +95,244 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
     mythic: '#ef4444',
   };
 
-  const getStatusColor = (status: Request['status']) => {
-    switch (status) {
-      case 'pending':
-        return { bg: '#f59e0b20', color: '#f59e0b' };
-      case 'approved':
-        return { bg: '#10b98120', color: '#10b981' };
-      case 'denied':
-        return { bg: '#ef444420', color: '#ef4444' };
-      case 'returned':
-        return { bg: '#8b5cf620', color: '#8b5cf6' };
-      case 'expired':
-        return { bg: '#6b728020', color: '#6b7280' };
-      default:
-        return { bg: '#6b728020', color: '#6b7280' };
+  const statusColors = {
+    pending: '#f59e0b',
+    approved: '#10b981',
+    denied: '#ef4444',
+    returned: '#8b5cf6',
+    expired: '#6b7280',
+  };
+
+  const filteredRequests = (requests || []).filter((req) => {
+    const matchesSearch = 
+      req.user.nickname.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      req.requestId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      req.item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesFilter = filterStatus === 'all' || req.status === filterStatus;
+    
+    return matchesSearch && matchesFilter;
+  });
+
+  const canEdit = ['owner', 'admin'].includes(userRole);
+
+  const handleApprove = async (id: string) => {
+    try {
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch(`/api/admin/requests/${id}/approve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to approve request');
+      }
+
+      toast.success('Request approved successfully');
+      fetchRequests(); // Перезагружаем список
+    } catch (error) {
+      console.error('Error approving request:', error);
+      toast.error('Failed to approve request');
     }
   };
 
-  const canApprove = ['owner', 'admin', 'operator'].includes(userRole);
+  const handleDeny = async (id: string) => {
+    try {
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch(`/api/admin/requests/${id}/deny`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-  const handleApprove = (requestId: string) => {
-    setRequests(requests.map(req => 
-      req.id === requestId ? { ...req, status: 'approved' } : req
-    ));
+      if (!response.ok) {
+        throw new Error('Failed to deny request');
+      }
+
+      toast.success('Request denied');
+      fetchRequests(); // Перезагружаем список
+    } catch (error) {
+      console.error('Error denying request:', error);
+      toast.error('Failed to deny request');
+    }
   };
 
-  const handleDeny = (requestId: string) => {
-    setRequests(requests.map(req => 
-      req.id === requestId ? { ...req, status: 'denied' } : req
-    ));
+  const handleReturn = async (id: string) => {
+    try {
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch(`/api/admin/requests/${id}/return`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to return request');
+      }
+
+      toast.success('Request returned to inventory');
+      fetchRequests(); // Перезагружаем список
+    } catch (error) {
+      console.error('Error returning request:', error);
+      toast.error('Failed to return request');
+    }
   };
 
-  const handleReturn = (requestId: string) => {
-    setRequests(requests.map(req => 
-      req.id === requestId ? { ...req, status: 'returned' } : req
-    ));
-  };
-
-  const handleSetPending = (requestId: string) => {
-    setRequests(requests.map(req => 
-      req.id === requestId ? { ...req, status: 'pending' } : req
-    ));
-  };
-
-  const filteredRequests = requests.filter((req) => {
-    const matchesSearch =
-      req.requestId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      req.user.nickname.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      req.user.phone.includes(searchQuery);
-    const matchesFilter = filterStatus === 'all' || req.status === filterStatus;
-    return matchesSearch && matchesFilter;
-  });
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading requests...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">{t('requests.title')}</h1>
-        <p className="text-gray-400">Manage all claim requests</p>
+        <p className="text-gray-400">{t('requests.subtitle')}</p>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
         {/* Search */}
-        <div className="flex-1 max-w-md relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
           <input
             type="text"
+            placeholder={t('requests.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('requests.search')}
-            className="w-full pl-11 pr-4 py-2.5 rounded-lg outline-none transition-all"
-            style={{
-              background: '#1d1d22',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: '#ffffff',
-            }}
+            className="w-full pl-10 pr-4 py-2 bg-[#1d1d22] border border-white/10 rounded-lg text-white placeholder-gray-500 focus:border-[#7c2d3a] focus:outline-none"
           />
         </div>
 
         {/* Status Filter */}
-        <div className="flex gap-2">
-          {(['all', 'pending', 'approved', 'denied', 'returned', 'expired'] as const).map((status) => (
-            <button
-              key={status}
-              onClick={() => setFilterStatus(status)}
-              className="px-4 py-2.5 rounded-lg font-medium transition-all capitalize"
-              style={{
-                background: filterStatus === status ? '#7c2d3a' : '#1d1d22',
-                color: filterStatus === status ? '#ffffff' : '#9ca3af',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-              }}
-            >
-              {t(`requests.filter${status.charAt(0).toUpperCase() + status.slice(1)}` as any)}
-            </button>
-          ))}
-        </div>
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as any)}
+          className="px-4 py-2 bg-[#1d1d22] border border-white/10 rounded-lg text-white focus:border-[#7c2d3a] focus:outline-none"
+        >
+          <option value="all">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="denied">Denied</option>
+          <option value="returned">Returned</option>
+          <option value="expired">Expired</option>
+        </select>
       </div>
 
       {/* Requests Table */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{
-          background: '#1d1d22',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-        }}
-      >
-        <table className="w-full">
-          <thead>
-            <tr style={{ background: '#25252a', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('requests.requestId')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('requests.user')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('requests.item')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('requests.case')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('requests.pc')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('requests.date')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('requests.status')}</th>
-              <th className="px-6 py-4 text-right text-sm font-medium text-gray-400">{t('requests.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <AnimatePresence>
-              {filteredRequests.map((req, index) => {
-                const statusColor = getStatusColor(req.status);
-                
-                return (
-                  <motion.tr
-                    key={req.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}
-                    className="hover:bg-white/5 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <span className="text-white font-mono text-sm">{req.requestId}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="text-white font-medium">{req.user.nickname}</p>
-                        <p className="text-gray-400 text-sm">{req.user.phone}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <img
-                          src={req.item.image}
-                          alt={req.item.name}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
+      <div className="rounded-xl overflow-hidden" style={{ background: '#1d1d22', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        {filteredRequests.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            No pending requests found
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Request ID</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">User</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Item</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Case</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">PC</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Date</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Status</th>
+                  {canEdit && <th className="text-right p-4 text-sm font-medium text-gray-400">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                <AnimatePresence>
+                  {filteredRequests.map((request) => (
+                    <motion.tr
+                      key={request.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                    >
+                      <td className="p-4">
+                        <span className="text-white font-mono text-sm">{request.requestId}</span>
+                      </td>
+                      <td className="p-4">
                         <div>
-                          <p className="text-white font-medium text-sm">{req.item.name}</p>
-                          <span
-                            className="text-xs font-medium capitalize"
-                            style={{ color: rarityColors[req.item.rarity] }}
-                          >
-                            {req.item.rarity}
-                          </span>
+                          <p className="text-white font-medium">{request.user.nickname}</p>
+                          <p className="text-gray-500 text-xs">{request.user.phone}</p>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-300">{req.case}</td>
-                    <td className="px-6 py-4">
-                      <span className="text-gray-400 font-mono text-sm">{req.pc}</span>
-                    </td>
-                    <td className="px-6 py-4 text-gray-400 text-sm">
-                      {req.date.toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className="px-3 py-1 rounded-full text-sm font-medium capitalize"
-                        style={{
-                          background: statusColor.bg,
-                          color: statusColor.color,
-                        }}
-                      >
-                        {t(`requests.${req.status}` as any)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-end gap-2">
-                        <button
-                          className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                          style={{ background: '#25252a' }}
-                          onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
-                          onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <img src={request.item.image} alt={request.item.name} className="w-12 h-12 rounded object-cover" />
+                          <div>
+                            <p className="text-white font-medium">{request.item.name}</p>
+                            <p className="text-xs" style={{ color: rarityColors[request.item.rarity] }}>
+                              {request.item.rarity.toUpperCase()}
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-gray-300">{request.case}</td>
+                      <td className="p-4 text-gray-300">{request.pc}</td>
+                      <td className="p-4 text-gray-300">{request.date.toLocaleDateString()}</td>
+                      <td className="p-4">
+                        <span
+                          className="inline-block px-3 py-1 rounded-full text-xs font-medium"
+                          style={{
+                            background: `${statusColors[request.status]}20`,
+                            color: statusColors[request.status],
+                          }}
                         >
-                          <Eye className="w-4 h-4 text-gray-400" />
-                        </button>
-                        
-                        {canApprove && req.status === 'pending' && (
-                          <>
-                            <button
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                              style={{ background: '#25252a' }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
-                              onClick={() => handleApprove(req.id)}
-                              title={t('requests.approve')}
-                            >
-                              <Check className="w-4 h-4 text-green-400" />
-                            </button>
-                            <button
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                              style={{ background: '#25252a' }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
-                              onClick={() => handleDeny(req.id)}
-                              title={t('requests.deny')}
-                            >
-                              <X className="w-4 h-4 text-red-400" />
-                            </button>
-                            <button
-                              className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                              style={{ background: '#25252a' }}
-                              onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
-                              onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
-                              onClick={() => handleReturn(req.id)}
-                              title={t('requests.return')}
-                            >
-                              <RotateCcw className="w-4 h-4 text-purple-400" />
-                            </button>
-                          </>
-                        )}
-                        
-                        {canApprove && req.status !== 'pending' && (
-                          <button
-                            className="px-3 py-1.5 rounded-lg flex items-center gap-2 transition-colors text-sm"
-                            style={{ background: '#25252a' }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
-                            onClick={() => handleSetPending(req.id)}
-                          >
-                            <RotateCcw className="w-3.5 h-3.5 text-orange-400" />
-                            <span className="text-white">Pending</span>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </motion.tr>
-                );
-              })}
-            </AnimatePresence>
-          </tbody>
-        </table>
-
-        {filteredRequests.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400">{t('common.noData')}</p>
+                          {request.status.toUpperCase()}
+                        </span>
+                      </td>
+                      {canEdit && (
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-2">
+                            {request.status === 'pending' && (
+                              <>
+                                <button
+                                  onClick={() => handleApprove(request.id)}
+                                  className="p-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-500 transition-colors"
+                                  title="Approve"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeny(request.id)}
+                                  className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-500 transition-colors"
+                                  title="Deny"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                            {request.status === 'approved' && (
+                              <button
+                                onClick={() => handleReturn(request.id)}
+                                className="p-2 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-500 transition-colors"
+                                title="Return to Inventory"
+                              >
+                                <RotateCcw className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      )}
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </tbody>
+            </table>
           </div>
         )}
       </div>

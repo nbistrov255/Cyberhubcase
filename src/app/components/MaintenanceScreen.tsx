@@ -1,14 +1,21 @@
 import { motion } from 'motion/react';
 import { Wrench, Clock } from 'lucide-react';
 
-export function MaintenanceScreen() {
+interface MaintenanceScreenProps {
+  isActive?: boolean;
+  message?: string;
+}
+
+export function MaintenanceScreen({ isActive = true, message }: MaintenanceScreenProps) {
+  if (!isActive) return null;
+
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 overflow-hidden"
     >
-      {/* Blurred Background */}
+      {/* Blurred Background - изменен на backdrop-blur-sm */}
       <div 
-        className="absolute inset-0 backdrop-blur-md bg-black/80"
+        className="absolute inset-0 backdrop-blur-sm bg-black/70"
         style={{
           backgroundImage: 'radial-gradient(circle at 20% 30%, rgba(124, 45, 58, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(154, 59, 74, 0.1) 0%, transparent 50%)',
         }}
@@ -50,7 +57,7 @@ export function MaintenanceScreen() {
           transition={{ delay: 0.3 }}
           className="text-5xl font-bold text-white mb-4 uppercase tracking-wider"
         >
-          Сайт временно недоступен
+          {message || 'Сайт временно недоступен'}
         </motion.h1>
 
         {/* Subtitle */}
@@ -60,7 +67,7 @@ export function MaintenanceScreen() {
           transition={{ delay: 0.4 }}
           className="text-xl text-gray-400 mb-8"
         >
-          Мы проводим технические работы, скоро вернемся
+          {message ? 'Проверяем соединение...' : 'Мы проводим технические работы, скоро вернемся'}
         </motion.p>
 
         {/* Description */}
@@ -75,8 +82,10 @@ export function MaintenanceScreen() {
           }}
         >
           <p className="text-gray-300 leading-relaxed">
-            В данный момент проводятся плановые технические работы для улучшения вашего опыта.
-            Мы скоро вернемся онлайн. Спасибо за терпение!
+            {message 
+              ? 'Сервер временно недоступен. Пытаемся восстановить соединение...'
+              : 'В данный момент проводятся плановые технические работы для улучшения вашего опыта. Мы скоро вернемся онлайн. Спасибо за терпение!'
+            }
           </p>
         </motion.div>
 

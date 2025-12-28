@@ -8,6 +8,14 @@ interface DashboardPageProps {
   onNavigate?: (page: AdminPage) => void;
 }
 
+interface Drop {
+  id: string;
+  player_nickname: string;
+  prize_name: string;
+  case_name: string;
+  created_at: string;
+}
+
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const { t } = useAdminLanguage();
   const [dashboardData, setDashboardData] = useState({
@@ -16,6 +24,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
     problemCases: 0,
     lowStock: 0,
   });
+  const [recentActivity, setRecentActivity] = useState<Drop[]>([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -23,13 +32,17 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
         const token = localStorage.getItem('session_token');
         
         // Загружаем все данные параллельно
-        const [requestsRes] = await Promise.all([
+        const [requestsRes, dropsRes] = await Promise.all([
           fetch('/api/admin/requests?status=pending', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+          fetch('/api/drops/recent', {
             headers: { 'Authorization': `Bearer ${token}` },
           }),
         ]);
 
         const requests = requestsRes.ok ? await requestsRes.json() : [];
+        const dropsData = dropsRes.ok ? await dropsRes.json() : { drops: [] };
 
         setDashboardData({
           casesOpened: 0, // TODO: Add API endpoint
@@ -37,6 +50,11 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           problemCases: 0, // TODO: Add API endpoint
           lowStock: 0, // TODO: Add API endpoint
         });
+
+        // Загружаем недавние дропы из API
+        if (dropsData.success && Array.isArray(dropsData.drops)) {
+          setRecentActivity(dropsData.drops.slice(0, 5)); // Берем только 5 последних
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       }
@@ -90,12 +108,22 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
     { label: t('dashboard.viewProblems'), link: 'problem-queue', color: '#ef4444' },
   ];
 
-  const recentActivity = [
-    { user: 'JohnDoe', action: 'Approved request #1234', time: '5 min ago' },
-    { user: 'AdminUser', action: 'Updated Case "Daily Gold"', time: '15 min ago' },
-    { user: 'JaneSmith', action: 'Added new item "Premium Headset"', time: '1 hour ago' },
-    { user: 'Operator1', action: 'Denied request #1230', time: '2 hours ago' },
-  ];
+  // Функция для форматирования времени
+  const formatTime = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins} min ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  };
 
   return (
     <div>
@@ -192,7 +220,7 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
           </div>
         </motion.div>
 
-        {/* Recent Activity */}
+        {/* Recent Activity - данные из API */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -203,34 +231,40 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
             border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
-          <h2 className="text-xl font-bold text-white mb-4">Recent Activity</h2>
+          <h2 className="text-xl font-bold text-white mb-4">Recent Drops</h2>
           <div className="space-y-4">
-            {recentActivity.map((activity, index) => (
-              <div
-                key={index}
-                className="flex items-start gap-4 p-4 rounded-lg"
-                style={{
-                  background: '#25252a',
-                }}
-              >
+            {recentActivity.length === 0 ? (
+              <div className="text-gray-400 text-center py-8">
+                No recent activity
+              </div>
+            ) : (
+              (recentActivity || []).map((drop, index) => (
                 <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                  key={drop.id || index}
+                  className="flex items-start gap-4 p-4 rounded-lg"
                   style={{
-                    background: '#7c2d3a',
-                    color: '#ffffff',
+                    background: '#25252a',
                   }}
                 >
-                  {activity.user.charAt(0)}
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center font-bold flex-shrink-0"
+                    style={{
+                      background: '#7c2d3a',
+                      color: '#ffffff',
+                    }}
+                  >
+                    {(drop.player_nickname || 'A').charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-white text-sm">
+                      <span className="font-medium">{drop.player_nickname || 'Anonymous'}</span>{' '}
+                      <span className="text-gray-400">won {drop.prize_name || 'Unknown Prize'} from {drop.case_name || 'Mystery Case'}</span>
+                    </p>
+                    <p className="text-gray-500 text-xs mt-1">{formatTime(drop.created_at)}</p>
+                  </div>
                 </div>
-                <div className="flex-1">
-                  <p className="text-white text-sm">
-                    <span className="font-medium">{activity.user}</span>{' '}
-                    <span className="text-gray-400">{activity.action}</span>
-                  </p>
-                  <p className="text-gray-500 text-xs mt-1">{activity.time}</p>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </motion.div>
       </div>

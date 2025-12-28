@@ -1,16 +1,23 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, RotateCcw, CheckCircle, MessageSquare } from 'lucide-react';
+import { Search, AlertTriangle, Check, X, Eye } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
+import { toast } from 'sonner';
 
 interface Problem {
   id: string;
-  requestId: string;
-  user: string;
-  issue: string;
-  type: 'error' | 'expired' | 'failed';
+  problemId: string;
+  user: {
+    nickname: string;
+    phone: string;
+    uuid: string;
+  };
+  type: 'technical' | 'payment' | 'item-claim' | 'account' | 'other';
+  description: string;
   date: Date;
+  status: 'pending' | 'in-progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
 }
 
 interface ProblemQueuePageProps {
@@ -20,214 +27,284 @@ interface ProblemQueuePageProps {
 export function ProblemQueuePage({ userRole }: ProblemQueuePageProps) {
   const { t } = useAdminLanguage();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | Problem['type']>('all');
+  const [filterStatus, setFilterStatus] = useState<'all' | Problem['status']>('all');
+  const [filterPriority, setFilterPriority] = useState<'all' | Problem['priority']>('all');
+  const [problems, setProblems] = useState<Problem[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const [problems, setProblems] = useState<Problem[]>([
-    {
-      id: '1',
-      requestId: 'REQ-2024-010',
-      user: 'PlayerError',
-      issue: 'Failed to deliver item - Steam API error',
-      type: 'error',
-      date: new Date('2024-12-24'),
-    },
-    {
-      id: '2',
-      requestId: 'REQ-2024-008',
-      user: 'ExpiredUser',
-      issue: 'Request expired after 48 hours',
-      type: 'expired',
-      date: new Date('2024-12-23'),
-    },
-  ]);
+  useEffect(() => {
+    fetchProblems();
+  }, []);
 
-  const canResolve = ['owner', 'admin', 'operator'].includes(userRole);
+  const fetchProblems = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch('/api/admin/problems', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-  const handleRetry = (problemId: string) => {
-    // In real app, this would trigger a retry action
-    console.log('Retrying problem:', problemId);
-    // Remove from queue after retry
-    setProblems(problems.filter(p => p.id !== problemId));
-  };
+      if (!response.ok) {
+        throw new Error('Failed to fetch problems');
+      }
 
-  const handleResolve = (problemId: string) => {
-    // Mark as resolved and remove from queue
-    console.log('Resolving problem:', problemId);
-    setProblems(problems.filter(p => p.id !== problemId));
-  };
+      const data = await response.json();
+      
+      // Преобразуем данные из API
+      const formattedProblems = (data || []).map((problem: any) => ({
+        id: problem.id,
+        problemId: problem.problem_id || `PRB-${problem.id}`,
+        user: {
+          nickname: problem.user_nickname || 'Unknown',
+          phone: problem.user_phone || 'N/A',
+          uuid: problem.user_uuid || '',
+        },
+        type: problem.type || 'other',
+        description: problem.description || 'No description',
+        date: problem.created_at ? new Date(problem.created_at) : new Date(),
+        status: problem.status || 'pending',
+        priority: problem.priority || 'medium',
+      }));
 
-  const filteredProblems = problems.filter((prob) => {
-    const matchesSearch =
-      prob.requestId.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      prob.user.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      prob.issue.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = filterType === 'all' || prob.type === filterType;
-    return matchesSearch && matchesFilter;
-  });
-
-  const getTypeColor = (type: Problem['type']) => {
-    switch (type) {
-      case 'error':
-        return { bg: '#ef444420', color: '#ef4444' };
-      case 'expired':
-        return { bg: '#f59e0b20', color: '#f59e0b' };
-      case 'failed':
-        return { bg: '#6b728020', color: '#6b7280' };
-      default:
-        return { bg: '#6b728020', color: '#6b7280' };
+      setProblems(formattedProblems);
+    } catch (error) {
+      console.error('Error fetching problems:', error);
+      toast.error('Failed to load problems');
+      setProblems([]); // Пустой массив при ошибке
+    } finally {
+      setLoading(false);
     }
   };
+
+  const priorityColors = {
+    low: '#10b981',
+    medium: '#f59e0b',
+    high: '#ef4444',
+    urgent: '#dc2626',
+  };
+
+  const statusColors = {
+    pending: '#f59e0b',
+    'in-progress': '#3b82f6',
+    resolved: '#10b981',
+    closed: '#6b7280',
+  };
+
+  const filteredProblems = (problems || []).filter((problem) => {
+    const matchesSearch =
+      problem.user.nickname.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      problem.problemId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      problem.description.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesStatus = filterStatus === 'all' || problem.status === filterStatus;
+    const matchesPriority = filterPriority === 'all' || problem.priority === filterPriority;
+
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
+
+  const canEdit = ['owner', 'admin'].includes(userRole);
+
+  const handleResolve = async (id: string) => {
+    try {
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch(`/api/admin/problems/${id}/resolve`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to resolve problem');
+      }
+
+      toast.success('Problem resolved successfully');
+      fetchProblems(); // Reload problems
+    } catch (error) {
+      console.error('Error resolving problem:', error);
+      toast.error('Failed to resolve problem');
+    }
+  };
+
+  const handleClose = async (id: string) => {
+    try {
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch(`/api/admin/problems/${id}/close`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to close problem');
+      }
+
+      toast.success('Problem closed');
+      fetchProblems(); // Reload problems
+    } catch (error) {
+      console.error('Error closing problem:', error);
+      toast.error('Failed to close problem');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading problems...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">{t('problems.title')}</h1>
-        <p className="text-gray-400">Resolve problematic cases and delivery errors</p>
+        <h1 className="text-3xl font-bold text-white mb-2">{t('problemQueue.title')}</h1>
+        <p className="text-gray-400">{t('problemQueue.subtitle')}</p>
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
         {/* Search */}
-        <div className="flex-1 max-w-md relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
           <input
             type="text"
+            placeholder="Search problems..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('problems.search')}
-            className="w-full pl-11 pr-4 py-2.5 rounded-lg outline-none transition-all"
-            style={{
-              background: '#1d1d22',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: '#ffffff',
-            }}
+            className="w-full pl-10 pr-4 py-2 bg-[#1d1d22] border border-white/10 rounded-lg text-white placeholder-gray-500 focus:border-[#7c2d3a] focus:outline-none"
           />
         </div>
 
-        {/* Type Filter */}
-        <div className="flex gap-2">
-          {(['all', 'error', 'expired', 'failed'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              className="px-4 py-2.5 rounded-lg font-medium transition-all capitalize"
-              style={{
-                background: filterType === type ? '#7c2d3a' : '#1d1d22',
-                color: filterType === type ? '#ffffff' : '#9ca3af',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-              }}
-            >
-              {t(`problems.filter${type.charAt(0).toUpperCase() + type.slice(1)}` as any)}
-            </button>
-          ))}
-        </div>
+        {/* Status Filter */}
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as any)}
+          className="px-4 py-2 bg-[#1d1d22] border border-white/10 rounded-lg text-white focus:border-[#7c2d3a] focus:outline-none"
+        >
+          <option value="all">All Statuses</option>
+          <option value="pending">Pending</option>
+          <option value="in-progress">In Progress</option>
+          <option value="resolved">Resolved</option>
+          <option value="closed">Closed</option>
+        </select>
+
+        {/* Priority Filter */}
+        <select
+          value={filterPriority}
+          onChange={(e) => setFilterPriority(e.target.value as any)}
+          className="px-4 py-2 bg-[#1d1d22] border border-white/10 rounded-lg text-white focus:border-[#7c2d3a] focus:outline-none"
+        >
+          <option value="all">All Priorities</option>
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="urgent">Urgent</option>
+        </select>
       </div>
 
       {/* Problems Table */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{
-          background: '#1d1d22',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-        }}
-      >
-        <table className="w-full">
-          <thead>
-            <tr style={{ background: '#25252a', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('problems.requestId')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('problems.user')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('problems.issue')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('problems.date')}</th>
-              <th className="px-6 py-4 text-right text-sm font-medium text-gray-400">{t('problems.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <AnimatePresence>
-              {filteredProblems.map((prob, index) => {
-                const typeColor = getTypeColor(prob.type);
-                
-                return (
-                  <motion.tr
-                    key={prob.id}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ delay: index * 0.05 }}
-                    style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}
-                    className="hover:bg-white/5 transition-colors"
-                  >
-                    <td className="px-6 py-4">
-                      <span className="text-white font-mono text-sm">{prob.requestId}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-white font-medium">{prob.user}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
+      <div className="rounded-xl overflow-hidden" style={{ background: '#1d1d22', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        {filteredProblems.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            {problems.length === 0 ? 'No problems in queue' : 'No problems match your filters'}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Problem ID</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">User</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Type</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Description</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Date</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Priority</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Status</th>
+                  {canEdit && <th className="text-right p-4 text-sm font-medium text-gray-400">Actions</th>}
+                </tr>
+              </thead>
+              <tbody>
+                <AnimatePresence>
+                  {filteredProblems.map((problem) => (
+                    <motion.tr
+                      key={problem.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                    >
+                      <td className="p-4">
+                        <span className="text-white font-mono text-sm">{problem.problemId}</span>
+                      </td>
+                      <td className="p-4">
+                        <div>
+                          <p className="text-white font-medium">{problem.user.nickname}</p>
+                          <p className="text-gray-500 text-xs">{problem.user.phone}</p>
+                        </div>
+                      </td>
+                      <td className="p-4 text-gray-300 capitalize">{problem.type.replace('-', ' ')}</td>
+                      <td className="p-4 text-gray-400 text-sm max-w-xs truncate">{problem.description}</td>
+                      <td className="p-4 text-gray-300 text-sm">{problem.date.toLocaleDateString()}</td>
+                      <td className="p-4">
                         <span
-                          className="px-2 py-1 rounded text-xs font-medium uppercase"
+                          className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium"
                           style={{
-                            background: typeColor.bg,
-                            color: typeColor.color,
+                            background: `${priorityColors[problem.priority]}20`,
+                            color: priorityColors[problem.priority],
                           }}
                         >
-                          {prob.type}
+                          <AlertTriangle className="w-3 h-3" />
+                          {problem.priority.toUpperCase()}
                         </span>
-                        <span className="text-gray-300">{prob.issue}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-gray-400 text-sm">
-                      {prob.date.toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4">
-                      {canResolve && (
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            className="flex items-center gap-2 px-3 py-2 rounded-lg transition-colors"
-                            style={{ background: '#25252a' }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#2d2d32';
-                              e.currentTarget.style.borderColor = '#10b981';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = '#25252a';
-                            }}
-                            onClick={() => handleRetry(prob.id)}
-                          >
-                            <RotateCcw className="w-4 h-4 text-blue-400" />
-                            <span className="text-sm text-white">{t('problems.retry')}</span>
-                          </button>
-                          <button
-                            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-                            style={{ background: '#25252a' }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
-                            onClick={() => handleResolve(prob.id)}
-                          >
-                            <CheckCircle className="w-4 h-4 text-green-400" />
-                          </button>
-                          <button
-                            className="w-9 h-9 rounded-lg flex items-center justify-center transition-colors"
-                            style={{ background: '#25252a' }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
-                          >
-                            <MessageSquare className="w-4 h-4 text-gray-400" />
-                          </button>
-                        </div>
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className="inline-block px-3 py-1 rounded-full text-xs font-medium"
+                          style={{
+                            background: `${statusColors[problem.status]}20`,
+                            color: statusColors[problem.status],
+                          }}
+                        >
+                          {problem.status.replace('-', ' ').toUpperCase()}
+                        </span>
+                      </td>
+                      {canEdit && (
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-2">
+                            {problem.status === 'pending' && (
+                              <button
+                                onClick={() => handleResolve(problem.id)}
+                                className="p-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-500 transition-colors"
+                                title="Resolve"
+                              >
+                                <Check className="w-4 h-4" />
+                              </button>
+                            )}
+                            {problem.status === 'resolved' && (
+                              <button
+                                onClick={() => handleClose(problem.id)}
+                                className="p-2 rounded-lg bg-gray-500/20 hover:bg-gray-500/30 text-gray-500 transition-colors"
+                                title="Close"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
                       )}
-                    </td>
-                  </motion.tr>
-                );
-              })}
-            </AnimatePresence>
-          </tbody>
-        </table>
-
-        {filteredProblems.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400">{t('common.noData')}</p>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </tbody>
+            </table>
           </div>
         )}
       </div>

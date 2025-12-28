@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, UserPlus, Edit2, Trash2, Ban, CheckCircle, X } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserFormModal, UserFormData } from '../components/UserFormModal';
 import { UserRole } from '../AdminApp';
+import { toast } from 'sonner';
 
 interface User extends UserFormData {
   id: string;
@@ -27,6 +28,8 @@ export function UsersPage({ userRole }: UsersPageProps) {
   const [blockDays, setBlockDays] = useState('');
   const [blockForever, setBlockForever] = useState(false);
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'blocked'>('all');
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Only owner can access this page
   if (userRole !== 'owner') {
@@ -40,164 +43,204 @@ export function UsersPage({ userRole }: UsersPageProps) {
     );
   }
 
-  const [users, setUsers] = useState<User[]>([
-    {
-      id: '1',
-      username: 'admin1',
-      email: 'admin@cyberhub.com',
-      fullName: 'Admin User',
-      password: '',
-      role: 'admin',
-      status: 'active',
-      useCustomPermissions: false,
-      permissions: {},
-      lastActive: new Date(),
-      createdAt: new Date(2024, 0, 15),
-    },
-    {
-      id: '2',
-      username: 'moderator1',
-      email: 'mod@cyberhub.com',
-      fullName: 'Moderator User',
-      password: '',
-      role: 'moderator',
-      status: 'active',
-      useCustomPermissions: false,
-      permissions: {},
-      lastActive: new Date(Date.now() - 3600000),
-      createdAt: new Date(2024, 2, 20),
-    },
-  ]);
+  useEffect(() => {
+    fetchUsers();
+  }, []);
 
-  const handleAddUser = () => {
-    setSelectedUser(null);
-    setIsModalOpen(true);
-  };
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-  const handleEditUser = (user: User) => {
-    setSelectedUser(user);
-    setIsModalOpen(true);
-  };
-
-  const handleDeleteUser = (userId: string) => {
-    if (window.confirm(t('users.deleteConfirm'))) {
-      setUsers(users.filter(u => u.id !== userId));
-    }
-  };
-
-  const handleSaveUser = (userData: UserFormData) => {
-    if (selectedUser) {
-      // Update existing user
-      setUsers(users.map(u => u.id === selectedUser.id ? { ...u, ...userData } : u));
-    } else {
-      // Add new user
-      const newUser: User = {
-        ...userData,
-        id: Date.now().toString(),
-        lastActive: new Date(),
-        createdAt: new Date(),
-      };
-      setUsers([...users, newUser]);
-    }
-  };
-
-  const openBlockModal = (user: User) => {
-    setUserToBlock(user);
-    setBlockDays('');
-    setBlockForever(false);
-    setShowBlockModal(true);
-  };
-
-  const handleBlockUser = () => {
-    if (!userToBlock) return;
-
-    let blockedUntil: Date | null = null;
-    let blockedForeverFlag = false;
-
-    if (blockForever) {
-      blockedForeverFlag = true;
-    } else if (blockDays) {
-      const days = parseInt(blockDays);
-      if (days > 0) {
-        blockedUntil = new Date();
-        blockedUntil.setDate(blockedUntil.getDate() + days);
+      if (!response.ok) {
+        throw new Error('Failed to fetch users');
       }
+
+      const data = await response.json();
+      
+      // Преобразуем данные из API
+      const formattedUsers = (data || []).map((user: any) => ({
+        id: user.id || user.uuid,
+        username: user.username || user.nickname,
+        email: user.email || '',
+        fullName: user.full_name || user.nickname,
+        password: '',
+        role: user.role || 'viewer',
+        lastActive: user.last_active ? new Date(user.last_active) : new Date(),
+        createdAt: user.created_at ? new Date(user.created_at) : new Date(),
+        blockedUntil: user.blocked_until ? new Date(user.blocked_until) : null,
+        blockedForever: user.blocked_forever || false,
+      }));
+
+      setUsers(formattedUsers);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      toast.error('Failed to load users');
+      setUsers([]); // Пустой массив при ошибке
+    } finally {
+      setLoading(false);
     }
-
-    setUsers(users.map(u => 
-      u.id === userToBlock.id 
-        ? { ...u, blockedUntil, blockedForever: blockedForeverFlag }
-        : u
-    ));
-
-    setShowBlockModal(false);
-    setUserToBlock(null);
-    setBlockDays('');
-    setBlockForever(false);
   };
 
-  const handleUnblockUser = (userId: string) => {
-    setUsers(users.map(u => 
-      u.id === userId 
-        ? { ...u, blockedUntil: null, blockedForever: false }
-        : u
-    ));
-  };
+  const filteredUsers = (users || []).filter((user) => {
+    const matchesSearch = 
+      user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (user.fullName && user.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (user.email && user.email.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  const isUserBlocked = (user: User): boolean => {
-    if (user.blockedForever) return true;
-    if (user.blockedUntil) {
-      return new Date() < user.blockedUntil;
-    }
-    return false;
-  };
+    const isBlocked = user.blockedForever || (user.blockedUntil && user.blockedUntil > new Date());
+    const matchesFilter =
+      filterStatus === 'all' ||
+      (filterStatus === 'active' && !isBlocked) ||
+      (filterStatus === 'blocked' && isBlocked);
 
-  const getBlockStatus = (user: User): string => {
-    if (user.blockedForever) return 'Blocked Forever';
-    if (user.blockedUntil && new Date() < user.blockedUntil) {
-      const days = Math.ceil((user.blockedUntil.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-      return `Blocked (${days}d left)`;
-    }
-    return user.status === 'active' ? 'Active' : 'Inactive';
-  };
-
-  const filteredUsers = users.filter(user =>
-    user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.fullName.toLowerCase().includes(searchQuery.toLowerCase())
-  ).filter(user => {
-    if (filterStatus === 'all') return true;
-    if (filterStatus === 'active') return !isUserBlocked(user);
-    if (filterStatus === 'blocked') return isUserBlocked(user);
-    return true;
+    return matchesSearch && matchesFilter;
   });
 
-  const getRoleBadgeColor = (role: UserRole | null) => {
-    switch (role) {
-      case 'owner':
-        return '#7c2d3a';
-      case 'admin':
-        return '#3b82f6';
-      case 'moderator':
-        return '#8b5cf6';
-      default:
-        return '#6b7280';
+  const handleSaveUser = async (userData: UserFormData) => {
+    try {
+      const token = localStorage.getItem('session_token');
+      
+      if (selectedUser) {
+        // Update existing user
+        const response = await fetch(`/api/admin/users/${selectedUser.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(userData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to update user');
+        }
+
+        toast.success('User updated successfully');
+      } else {
+        // Create new user
+        const response = await fetch('/api/admin/users', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify(userData),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to create user');
+        }
+
+        toast.success('User created successfully');
+      }
+
+      setIsModalOpen(false);
+      setSelectedUser(null);
+      fetchUsers(); // Reload users
+    } catch (error) {
+      console.error('Error saving user:', error);
+      toast.error('Failed to save user');
     }
   };
 
-  const formatDate = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user?')) {
+      return;
+    }
 
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 30) return `${days}d ago`;
-    return date.toLocaleDateString();
+    try {
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch(`/api/admin/users/${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete user');
+      }
+
+      toast.success('User deleted successfully');
+      fetchUsers(); // Reload users
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error('Failed to delete user');
+    }
   };
+
+  const handleBlockUser = async () => {
+    if (!userToBlock) return;
+
+    try {
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch(`/api/admin/users/${userToBlock.id}/block`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          blockForever,
+          blockDays: blockForever ? null : parseInt(blockDays),
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to block user');
+      }
+
+      toast.success('User blocked successfully');
+      setShowBlockModal(false);
+      setUserToBlock(null);
+      setBlockDays('');
+      setBlockForever(false);
+      fetchUsers(); // Reload users
+    } catch (error) {
+      console.error('Error blocking user:', error);
+      toast.error('Failed to block user');
+    }
+  };
+
+  const handleUnblockUser = async (userId: string) => {
+    try {
+      const token = localStorage.getItem('session_token');
+      
+      const response = await fetch(`/api/admin/users/${userId}/unblock`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to unblock user');
+      }
+
+      toast.success('User unblocked successfully');
+      fetchUsers(); // Reload users
+    } catch (error) {
+      console.error('Error unblocking user:', error);
+      toast.error('Failed to unblock user');
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-white">Loading users...</div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -205,389 +248,238 @@ export function UsersPage({ userRole }: UsersPageProps) {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">{t('users.title')}</h1>
-          <p className="text-gray-400">Manage admin panel users and permissions</p>
+          <p className="text-gray-400">{t('users.subtitle')}</p>
         </div>
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleAddUser}
-          className="flex items-center gap-2 px-6 py-3 rounded-lg font-medium transition-all"
-          style={{
-            background: '#7c2d3a',
-            color: '#ffffff',
+        <button
+          onClick={() => {
+            setSelectedUser(null);
+            setIsModalOpen(true);
           }}
+          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#7c2d3a] to-[#9a3b4a] hover:from-[#9a3b4a] hover:to-[#7c2d3a] rounded-lg font-medium transition-all"
         >
           <UserPlus className="w-5 h-5" />
-          {t('users.addNew')}
-        </motion.button>
+          Add User
+        </button>
       </div>
 
-      {/* Search Bar */}
-      <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4 mb-6">
+        {/* Search */}
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
           <input
             type="text"
-            placeholder="Search by username, email, or name..."
+            placeholder="Search users..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-4 py-3 rounded-lg outline-none"
-            style={{
-              background: '#1d1d22',
-              border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: '#ffffff',
-            }}
+            className="w-full pl-10 pr-4 py-2 bg-[#1d1d22] border border-white/10 rounded-lg text-white placeholder-gray-500 focus:border-[#7c2d3a] focus:outline-none"
           />
         </div>
-      </div>
 
-      {/* Status Filters */}
-      <div className="flex gap-2 mb-6">
-        <button
-          onClick={() => setFilterStatus('all')}
-          className="px-5 py-2.5 rounded-lg font-medium transition-all"
-          style={{
-            background: filterStatus === 'all' ? '#7c2d3a' : '#1d1d22',
-            color: filterStatus === 'all' ? '#ffffff' : '#9ca3af',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-          }}
+        {/* Status Filter */}
+        <select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as any)}
+          className="px-4 py-2 bg-[#1d1d22] border border-white/10 rounded-lg text-white focus:border-[#7c2d3a] focus:outline-none"
         >
-          All Users
-        </button>
-        <button
-          onClick={() => setFilterStatus('active')}
-          className="px-5 py-2.5 rounded-lg font-medium transition-all"
-          style={{
-            background: filterStatus === 'active' ? '#7c2d3a' : '#1d1d22',
-            color: filterStatus === 'active' ? '#ffffff' : '#9ca3af',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-          }}
-        >
-          Active
-        </button>
-        <button
-          onClick={() => setFilterStatus('blocked')}
-          className="px-5 py-2.5 rounded-lg font-medium transition-all"
-          style={{
-            background: filterStatus === 'blocked' ? '#7c2d3a' : '#1d1d22',
-            color: filterStatus === 'blocked' ? '#ffffff' : '#9ca3af',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
-          }}
-        >
-          Blocked
-        </button>
+          <option value="all">All Users</option>
+          <option value="active">Active</option>
+          <option value="blocked">Blocked</option>
+        </select>
       </div>
 
       {/* Users Table */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{
-          background: '#1d1d22',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-        }}
-      >
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">
-                  {t('users.username')}
-                </th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">
-                  {t('users.email')}
-                </th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">
-                  {t('users.fullName')}
-                </th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">
-                  {t('users.role')}
-                </th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">
-                  {t('users.lastActive')}
-                </th>
-                <th className="text-left px-6 py-4 text-sm font-medium text-gray-400">
-                  {t('users.status')}
-                </th>
-                <th className="text-right px-6 py-4 text-sm font-medium text-gray-400">
-                  {t('common.actions')}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((user) => (
-                <tr
-                  key={user.id}
-                  style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center font-bold"
-                        style={{
-                          background: getRoleBadgeColor(user.role),
-                          color: '#ffffff',
-                        }}
-                      >
-                        {user.username.charAt(0).toUpperCase()}
-                      </div>
-                      <span className="text-white font-medium">{user.username}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-gray-400">{user.email}</td>
-                  <td className="px-6 py-4 text-white">{user.fullName}</td>
-                  <td className="px-6 py-4">
-                    <span
-                      className="px-3 py-1 rounded-full text-xs font-medium capitalize"
-                      style={{
-                        background: `${getRoleBadgeColor(user.role)}33`,
-                        color: getRoleBadgeColor(user.role),
-                      }}
-                    >
-                      {user.role || 'no role'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-400 text-sm">
-                    {formatDate(user.lastActive)}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className="px-3 py-1 rounded-full text-xs font-medium capitalize"
-                      style={{
-                        background: isUserBlocked(user) ? '#ef444433' : (user.status === 'active' ? '#10b98133' : '#6b728033'),
-                        color: isUserBlocked(user) ? '#ef4444' : (user.status === 'active' ? '#10b981' : '#6b7280'),
-                      }}
-                    >
-                      {getBlockStatus(user)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleEditUser(user)}
-                        className="p-2 rounded-lg transition-all"
-                        style={{ background: '#25252a' }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#2d2d32';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = '#25252a';
-                        }}
-                      >
-                        <Edit2 className="w-4 h-4 text-blue-400" />
-                      </button>
-                      {isUserBlocked(user) ? (
-                        <button
-                          onClick={() => handleUnblockUser(user.id)}
-                          className="p-2 rounded-lg transition-all"
-                          style={{ background: '#25252a' }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#2d2d32';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#25252a';
-                          }}
-                        >
-                          <CheckCircle className="w-4 h-4 text-green-400" />
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => openBlockModal(user)}
-                          className="p-2 rounded-lg transition-all"
-                          style={{ background: '#25252a' }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#2d2d32';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#25252a';
-                          }}
-                        >
-                          <Ban className="w-4 h-4 text-orange-400" />
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="p-2 rounded-lg transition-all"
-                        style={{ background: '#25252a' }}
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#2d2d32';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.background = '#25252a';
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4 text-red-400" />
-                      </button>
-                    </div>
-                  </td>
+      <div className="rounded-xl overflow-hidden" style={{ background: '#1d1d22', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        {filteredUsers.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">
+            {loading ? 'Loading...' : 'No users found'}
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-white/10">
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">User</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Role</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Last Active</th>
+                  <th className="text-left p-4 text-sm font-medium text-gray-400">Status</th>
+                  <th className="text-right p-4 text-sm font-medium text-gray-400">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                <AnimatePresence>
+                  {filteredUsers.map((user) => {
+                    const isBlocked = user.blockedForever || (user.blockedUntil && user.blockedUntil > new Date());
 
-        {filteredUsers.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400">{t('common.noData')}</p>
+                    return (
+                      <motion.tr
+                        key={user.id}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="border-b border-white/5 hover:bg-white/5 transition-colors"
+                      >
+                        <td className="p-4">
+                          <div>
+                            <p className="text-white font-medium">{user.fullName || user.username}</p>
+                            <p className="text-gray-500 text-xs">{user.email || user.username}</p>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <span
+                            className="inline-block px-3 py-1 rounded-full text-xs font-medium"
+                            style={{
+                              background: user.role === 'owner' ? '#ef444420' : user.role === 'admin' ? '#f59e0b20' : '#10b98120',
+                              color: user.role === 'owner' ? '#ef4444' : user.role === 'admin' ? '#f59e0b' : '#10b981',
+                            }}
+                          >
+                            {user.role.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="p-4 text-gray-300 text-sm">
+                          {user.lastActive.toLocaleDateString()}
+                        </td>
+                        <td className="p-4">
+                          {isBlocked ? (
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-red-500/20 text-red-500">
+                              <Ban className="w-3 h-3" />
+                              {user.blockedForever ? 'Blocked Forever' : `Blocked until ${user.blockedUntil?.toLocaleDateString()}`}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-500">
+                              <CheckCircle className="w-3 h-3" />
+                              Active
+                            </span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              onClick={() => {
+                                setSelectedUser(user);
+                                setIsModalOpen(true);
+                              }}
+                              className="p-2 rounded-lg bg-blue-500/20 hover:bg-blue-500/30 text-blue-500 transition-colors"
+                              title="Edit"
+                            >
+                              <Edit2 className="w-4 h-4" />
+                            </button>
+                            
+                            {isBlocked ? (
+                              <button
+                                onClick={() => handleUnblockUser(user.id)}
+                                className="p-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-500 transition-colors"
+                                title="Unblock"
+                              >
+                                <CheckCircle className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setUserToBlock(user);
+                                  setShowBlockModal(true);
+                                }}
+                                className="p-2 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-500 transition-colors"
+                                title="Block"
+                              >
+                                <Ban className="w-4 h-4" />
+                              </button>
+                            )}
+
+                            <button
+                              onClick={() => handleDeleteUser(user.id)}
+                              className="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-500 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </motion.tr>
+                    );
+                  })}
+                </AnimatePresence>
+              </tbody>
+            </table>
           </div>
         )}
       </div>
 
       {/* User Form Modal */}
-      <UserFormModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onSave={handleSaveUser}
-        userData={selectedUser}
-      />
+      {isModalOpen && (
+        <UserFormModal
+          user={selectedUser}
+          onSave={handleSaveUser}
+          onClose={() => {
+            setIsModalOpen(false);
+            setSelectedUser(null);
+          }}
+        />
+      )}
 
       {/* Block User Modal */}
       <AnimatePresence>
         {showBlockModal && userToBlock && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/80"
+            onClick={() => setShowBlockModal(false)}
+          >
             <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setShowBlockModal(false)}
-              className="absolute inset-0"
-              style={{ background: 'rgba(0, 0, 0, 0.8)' }}
-            />
-
-            {/* Modal */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-md rounded-xl overflow-hidden"
-              style={{
-                background: '#1d1d22',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-              }}
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-[#1d1d22] border border-white/10 rounded-xl p-6"
             >
-              {/* Header */}
-              <div
-                className="flex items-center justify-between p-6"
-                style={{
-                  borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
-                }}
-              >
-                <div>
-                  <h2 className="text-2xl font-bold text-white">Block User</h2>
-                  <p className="text-gray-400 text-sm mt-1">
-                    Block {userToBlock.username} from accessing admin panel
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowBlockModal(false)}
-                  className="p-2 rounded-lg transition-all"
-                  style={{ background: '#25252a' }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#2d2d32';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#25252a';
-                  }}
-                >
-                  <X className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
+              <h2 className="text-2xl font-bold text-white mb-4">Block User</h2>
+              <p className="text-gray-400 mb-6">
+                Block <span className="text-white font-medium">{userToBlock.fullName || userToBlock.username}</span>
+              </p>
 
-              {/* Form */}
-              <div className="p-6 space-y-6">
-                {/* Block Duration */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Block Duration (Days)
-                  </label>
+              <div className="space-y-4 mb-6">
+                <label className="flex items-center gap-3">
                   <input
-                    type="number"
-                    min="1"
-                    value={blockDays}
-                    onChange={(e) => setBlockDays(e.target.value)}
-                    disabled={blockForever}
-                    placeholder="Enter number of days"
-                    className="w-full px-4 py-2.5 rounded-lg outline-none transition-all"
-                    style={{
-                      background: blockForever ? '#1a1a1f' : '#25252a',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      color: blockForever ? '#6b7280' : '#ffffff',
-                    }}
+                    type="checkbox"
+                    checked={blockForever}
+                    onChange={(e) => setBlockForever(e.target.checked)}
+                    className="w-5 h-5"
                   />
-                </div>
+                  <span className="text-white">Block forever</span>
+                </label>
 
-                {/* Block Forever Checkbox */}
-                <div
-                  className="p-4 rounded-lg"
-                  style={{
-                    background: '#25252a',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
-                  }}
-                >
-                  <label className="flex items-center gap-3 cursor-pointer">
+                {!blockForever && (
+                  <div>
+                    <label className="block text-gray-400 text-sm mb-2">Block for (days)</label>
                     <input
-                      type="checkbox"
-                      checked={blockForever}
-                      onChange={(e) => {
-                        setBlockForever(e.target.checked);
-                        if (e.target.checked) setBlockDays('');
-                      }}
-                      className="w-5 h-5 rounded"
-                      style={{
-                        accentColor: '#7c2d3a',
-                      }}
+                      type="number"
+                      value={blockDays}
+                      onChange={(e) => setBlockDays(e.target.value)}
+                      placeholder="Enter number of days"
+                      className="w-full px-4 py-2 bg-[#25252a] border border-white/10 rounded-lg text-white focus:border-[#7c2d3a] focus:outline-none"
                     />
-                    <div>
-                      <span className="text-white font-medium block">Block Forever</span>
-                      <span className="text-gray-400 text-sm">
-                        Permanently block this user from admin access
-                      </span>
-                    </div>
-                  </label>
-                </div>
+                  </div>
+                )}
               </div>
 
-              {/* Footer */}
-              <div
-                className="flex items-center justify-end gap-3 p-6"
-                style={{
-                  borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                }}
-              >
+              <div className="flex gap-3">
                 <button
                   onClick={() => setShowBlockModal(false)}
-                  className="px-6 py-2.5 rounded-lg font-medium transition-all"
-                  style={{
-                    background: '#25252a',
-                    color: '#ffffff',
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = '#2d2d32';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = '#25252a';
-                  }}
+                  className="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg font-medium transition-colors"
                 >
                   Cancel
                 </button>
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                <button
                   onClick={handleBlockUser}
-                  disabled={!blockForever && !blockDays}
-                  className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-medium"
-                  style={{
-                    background: (!blockForever && !blockDays) ? '#6b7280' : '#ef4444',
-                    color: '#ffffff',
-                    cursor: (!blockForever && !blockDays) ? 'not-allowed' : 'pointer',
-                  }}
+                  className="flex-1 px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-500 rounded-lg font-medium transition-colors"
                 >
-                  <Ban className="w-5 h-5" />
                   Block User
-                </motion.button>
+                </button>
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

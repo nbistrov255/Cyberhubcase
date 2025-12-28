@@ -4,6 +4,7 @@ import { Plus, Search, Edit, Trash2 } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
 import { CaseFormModal, CaseFormData } from '../components/CaseFormModal';
+import { toast } from 'sonner';
 
 interface Case {
   id: string;
@@ -156,9 +157,10 @@ export function CasesPage({ userRole }: CasesPageProps) {
       }
       
       closeModal();
+      toast.success(t('cases.saveSuccess'));
     } catch (error) {
       console.error('Error saving case:', error);
-      alert(`Failed to save case: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast.error(`Failed to save case: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -177,9 +179,10 @@ export function CasesPage({ userRole }: CasesPageProps) {
       }
 
       setCases(cases.filter((c) => c.id !== caseId));
+      toast.success(t('cases.deleteSuccess'));
     } catch (error) {
       console.error('Error deleting case:', error);
-      alert('Failed to delete case. Please try again.');
+      toast.error('Failed to delete case. Please try again.');
     }
   };
 
