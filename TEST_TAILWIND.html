@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tailwind CSS Test</title>
+  <style>
+    /* Если вы видите этот стиль - Tailwind НЕ работает */
+    .test-tailwind {
+      background: yellow !important;
+      color: black !important;
+      padding: 20px;
+      border: 5px solid red;
+    }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <!-- 
+      ИНСТРУКЦИЯ ПО ТЕСТИРОВАНИЮ:
+      
+      1. Откройте http://localhost:5173 после npm run dev
+      2. Откройте DevTools (F12) → Elements
+      3. Найдите любой элемент с Tailwind классами
+      4. Скопируйте этот тестовый блок и вставьте в консоль:
+    -->
+    
+    <div class="test-tailwind bg-[#17171c] text-white p-8 rounded-lg border border-white/10">
+      <h1 class="text-4xl font-bold mb-4">🧪 Тест Tailwind CSS v4</h1>
+      
+      <div class="space-y-4">
+        <div class="bg-[#7c2d3a] p-4 rounded">
+          <p class="font-bold">Если фон БОРДОВЫЙ - Tailwind работает! ✅</p>
+        </div>
+        
+        <div class="bg-yellow-500 p-4 rounded text-black">
+          <p class="font-bold">Если фон ЖЕЛТЫЙ из &lt;style&gt; - Tailwind НЕ работает! ❌</p>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-blue-500 p-4 rounded text-center">1</div>
+          <div class="bg-purple-500 p-4 rounded text-center">2</div>
+          <div class="bg-red-500 p-4 rounded text-center">3</div>
+        </div>
+        
+        <div class="flex items-center gap-4">
+          <button class="px-6 py-3 bg-[#7c2d3a] text-white rounded-lg hover:bg-[#8c3d4a] transition-all">
+            Кнопка
+          </button>
+          
+          <span class="text-gray-400">← Должна быть бордовой</span>
+        </div>
+      </div>
+      
+      <hr class="my-6 border-white/10">
+      
+      <div class="text-sm text-gray-400">
+        <p><strong>Проверка конфигурации:</strong></p>
+        <ul class="list-disc list-inside space-y-1 mt-2">
+          <li>Tailwind v4.1.12 установлен?</li>
+          <li>@tailwindcss/vite плагин подключен?</li>
+          <li>import './styles/index.css' в main.tsx?</li>
+          <li>Кэш Vite очищен?</li>
+          <li>Браузер обновлен (Ctrl+Shift+R)?</li>
+        </ul>
+      </div>
+    </div>
+    
+    <script>
+      // Проверка в консоли
+      console.log('%c🔍 Tailwind CSS Diagnostic', 'font-size: 20px; font-weight: bold; color: #7c2d3a;');
+      
+      const testEl = document.querySelector('.test-tailwind');
+      const computed = window.getComputedStyle(testEl);
+      
+      console.log('Background color:', computed.backgroundColor);
+      console.log('Padding:', computed.padding);
+      console.log('Border:', computed.border);
+      
+      if (computed.backgroundColor === 'rgb(23, 23, 28)') {
+        console.log('%c✅ Tailwind работает!', 'color: green; font-weight: bold;');
+      } else {
+        console.log('%c❌ Tailwind НЕ работает! Фон должен быть rgb(23, 23, 28)', 'color: red; font-weight: bold;');
+        console.log('Проверьте:');
+        console.log('1. npm run dev запущен?');
+        console.log('2. node_modules/.vite удален?');
+        console.log('3. Браузер обновлен (Ctrl+Shift+R)?');
+      }
+    </script>
+  </div>
+</body>
+</html>
