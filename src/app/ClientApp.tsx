@@ -11,6 +11,7 @@ import { SettingsModal } from './components/SettingsModal';
 import { CaseContentPage } from './components/CaseContentPage';
 import { CaseOpenPage } from './components/CaseOpenPage';
 import { LoginModal } from './components/LoginModal';
+import { MaintenanceScreen } from './components/MaintenanceScreen';
 import { toast, Toaster } from 'sonner';
 
 export type Page = 'cases' | 'opening' | 'win' | 'inventory' | 'profile-public' | 'profile-private' | 'case-content' | 'case-open';
@@ -76,6 +77,21 @@ function ClientAppContent() {
   
   // Получаем баланс из профиля
   const balance = profile?.dailySum || 0;
+
+  // Check maintenance mode
+  const isMaintenanceMode = (() => {
+    try {
+      const maintenanceMode = localStorage.getItem('maintenanceMode');
+      return maintenanceMode === 'true';
+    } catch {
+      return false;
+    }
+  })();
+
+  // Show maintenance screen if maintenance mode is enabled
+  if (isMaintenanceMode) {
+    return <MaintenanceScreen />;
+  }
 
   const handleCaseClick = (caseData: any) => {
     // Гость может просмотреть страницу кейса, но передаем флаг авторизации

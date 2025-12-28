@@ -39,12 +39,14 @@ interface Case {
   nameLv: string;
   nameRu: string;
   nameEn: string;
-  type: 'daily' | 'monthly';
+  type: 'daily' | 'monthly' | 'event';
   threshold: number;
   status: 'draft' | 'published' | 'archived';
   image: string;
   lastModified: Date;
   contents?: CaseItem[];
+  eventEndsAt?: Date;
+  eventDurationDays?: number;
 }
 
 interface CaseFormModalProps {
@@ -59,11 +61,13 @@ export interface CaseFormData {
   nameLv: string;
   nameRu: string;
   nameEn: string;
-  type: 'daily' | 'monthly';
+  type: 'daily' | 'monthly' | 'event';
   threshold: number;
   status: 'draft' | 'published' | 'archived';
   image: string;
   contents?: CaseItem[];
+  eventEndsAt?: Date;
+  eventDurationDays?: number;
 }
 
 export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormModalProps) {
@@ -450,7 +454,7 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
                       </label>
                       <select
                         value={formData.type}
-                        onChange={(e) => setFormData({ ...formData, type: e.target.value as 'daily' | 'monthly' })}
+                        onChange={(e) => setFormData({ ...formData, type: e.target.value as 'daily' | 'monthly' | 'event' })}
                         className="w-full px-4 py-2.5 rounded-lg outline-none"
                         style={{
                           background: '#25252a',
@@ -460,6 +464,7 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
                       >
                         <option value="daily">{t('cases.typeDaily')}</option>
                         <option value="monthly">{t('cases.typeMonthly')}</option>
+                        <option value="event">{t('cases.typeEvent')}</option>
                       </select>
                     </div>
 
@@ -483,6 +488,62 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
                       />
                     </div>
                   </div>
+
+                  {/* Event Duration - Only show for event type */}
+                  {formData.type === 'event' && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        {t('cases.eventDuration')} (Days)
+                      </label>
+                      <div className="space-y-3">
+                        <input
+                          type="number"
+                          required
+                          min="1"
+                          max="365"
+                          value={formData.eventDurationDays || ''}
+                          onChange={(e) => {
+                            const days = parseInt(e.target.value) || 0;
+                            const endsAt = new Date();
+                            endsAt.setDate(endsAt.getDate() + days);
+                            setFormData({ 
+                              ...formData, 
+                              eventDurationDays: days,
+                              eventEndsAt: endsAt
+                            });
+                          }}
+                          placeholder="Enter number of days"
+                          className="w-full px-4 py-2.5 rounded-lg outline-none"
+                          style={{
+                            background: '#25252a',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            color: '#ffffff',
+                          }}
+                        />
+                        {formData.eventDurationDays && formData.eventDurationDays > 0 && (
+                          <div 
+                            className="p-3 rounded-lg flex items-center gap-2"
+                            style={{
+                              background: '#7c2d3a20',
+                              border: '1px solid #7c2d3a40',
+                            }}
+                          >
+                            <Info className="w-4 h-4" style={{ color: '#7c2d3a' }} />
+                            <div className="text-sm">
+                              <p style={{ color: '#7c2d3a' }} className="font-medium">
+                                Event will end in {formData.eventDurationDays} day{formData.eventDurationDays !== 1 ? 's' : ''}
+                              </p>
+                              {formData.eventEndsAt && (
+                                <p className="text-xs text-gray-400 mt-1">
+                                  Countdown will start from: {formData.eventEndsAt.toLocaleString()}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Status */}
                   <div>

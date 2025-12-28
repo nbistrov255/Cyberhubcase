@@ -1,0 +1,113 @@
+import { motion } from 'motion/react';
+import { Wrench, Clock } from 'lucide-react';
+
+export function MaintenanceScreen() {
+  return (
+    <div 
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: '#17171c' }}
+    >
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-2xl w-full text-center"
+      >
+        {/* Icon */}
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
+          className="flex justify-center mb-8"
+        >
+          <div 
+            className="w-32 h-32 rounded-full flex items-center justify-center relative"
+            style={{ background: 'linear-gradient(135deg, #7c2d3a 0%, #9a3b4a 100%)' }}
+          >
+            <Wrench className="w-16 h-16 text-white" />
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              className="absolute"
+              style={{ top: '10px', right: '10px' }}
+            >
+              <Clock className="w-8 h-8 text-white/60" />
+            </motion.div>
+          </div>
+        </motion.div>
+
+        {/* Title */}
+        <motion.h1
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-5xl font-bold text-white mb-4 uppercase tracking-wider"
+        >
+          Under Maintenance
+        </motion.h1>
+
+        {/* Subtitle */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="text-xl text-gray-400 mb-8"
+        >
+          The application is temporarily unavailable
+        </motion.p>
+
+        {/* Description */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="rounded-xl p-6 mb-8"
+          style={{
+            background: '#1d1d22',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
+          }}
+        >
+          <p className="text-gray-300 leading-relaxed">
+            We're currently performing scheduled maintenance to improve your experience. 
+            We'll be back online shortly. Thank you for your patience!
+          </p>
+        </motion.div>
+
+        {/* Animated dots */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="flex items-center justify-center gap-2"
+        >
+          {[0, 1, 2].map((i) => (
+            <motion.div
+              key={i}
+              animate={{
+                scale: [1, 1.5, 1],
+                opacity: [0.3, 1, 0.3],
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                delay: i * 0.2,
+              }}
+              className="w-3 h-3 rounded-full"
+              style={{ background: '#7c2d3a' }}
+            />
+          ))}
+        </motion.div>
+
+        {/* Footer note */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.7 }}
+          className="mt-12 text-sm text-gray-500"
+        >
+          If you believe this is an error, please contact support
+        </motion.p>
+      </motion.div>
+    </div>
+  );
+}

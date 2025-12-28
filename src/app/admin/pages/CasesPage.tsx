@@ -10,11 +10,13 @@ interface Case {
   nameLv: string;
   nameRu: string;
   nameEn: string;
-  type: 'daily' | 'monthly';
+  type: 'daily' | 'monthly' | 'event';
   threshold: number;
   status: 'draft' | 'published' | 'archived';
   image: string;
   lastModified: Date;
+  eventEndsAt?: Date;
+  eventDurationDays?: number;
 }
 
 interface CasesPageProps {
@@ -24,7 +26,7 @@ interface CasesPageProps {
 export function CasesPage({ userRole }: CasesPageProps) {
   const { t, language } = useAdminLanguage();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'daily' | 'monthly'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'daily' | 'monthly' | 'event'>('all');
   const [filterStatus, setFilterStatus] = useState<'all' | 'draft' | 'published' | 'archived'>('all');
   const [cases, setCases] = useState<Case[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,7 +212,7 @@ export function CasesPage({ userRole }: CasesPageProps) {
           <div className="relative">
             <select
               value={filterType}
-              onChange={(e) => setFilterType(e.target.value as 'all' | 'daily' | 'monthly')}
+              onChange={(e) => setFilterType(e.target.value as 'all' | 'daily' | 'monthly' | 'event')}
               className="w-40 px-4 py-2.5 pr-10 rounded-lg outline-none transition-all appearance-none cursor-pointer"
               style={{
                 background: '#1d1d22',
@@ -221,6 +223,7 @@ export function CasesPage({ userRole }: CasesPageProps) {
               <option value="all">{t('cases.filterTypeAll')}</option>
               <option value="daily">{t('cases.filterTypeDaily')}</option>
               <option value="monthly">{t('cases.filterTypeMonthly')}</option>
+              <option value="event">{t('cases.filterTypeEvent')}</option>
             </select>
             <div className="absolute inset-y-0 right-0 flex items-center px-3 pointer-events-none">
               <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

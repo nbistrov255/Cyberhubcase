@@ -29,6 +29,14 @@ export function SettingsPage({ userRole }: SettingsPageProps) {
     bannerBackground: 'https://i.ibb.co/nqGS31TR/Chat-GPT-Image-24-2025-04-05-54.png',
     profileBackground: 'https://i.ibb.co/0jf2XZFw/Chat-GPT-Image-25-2025-00-01-32.png',
     snowEffect: true,
+    maintenanceMode: (() => {
+      try {
+        const saved = localStorage.getItem('maintenanceMode');
+        return saved === 'true';
+      } catch {
+        return false;
+      }
+    })(),
     // General
     lowStockThreshold: 10,
     expireTtl: 48,
@@ -43,6 +51,8 @@ export function SettingsPage({ userRole }: SettingsPageProps) {
 
   const handleSave = () => {
     console.log('Settings saved:', settings);
+    // Save maintenance mode to localStorage so client app can check it
+    localStorage.setItem('maintenanceMode', JSON.stringify(settings.maintenanceMode));
     // Show success notification
   };
 
@@ -152,6 +162,52 @@ export function SettingsPage({ userRole }: SettingsPageProps) {
                   </button>
                 </div>
                 <p className="text-xs text-gray-500">{t('settings.snowEffectHint')}</p>
+              </div>
+            </div>
+
+            {/* Maintenance Mode */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {t('settings.maintenanceMode')}
+              </label>
+              <div
+                className="rounded-lg p-4"
+                style={{
+                  background: '#25252a',
+                  border: settings.maintenanceMode ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.05)',
+                }}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white font-medium">
+                    {settings.maintenanceMode ? t('settings.enabled') : t('settings.disabled')}
+                  </span>
+                  <button
+                    onClick={() => setSettings({ ...settings, maintenanceMode: !settings.maintenanceMode })}
+                    className="relative w-14 h-7 rounded-full transition-all"
+                    style={{
+                      background: settings.maintenanceMode ? '#ef4444' : '#3d3d42',
+                    }}
+                  >
+                    <div
+                      className="absolute top-1 w-5 h-5 bg-white rounded-full transition-all"
+                      style={{
+                        left: settings.maintenanceMode ? '32px' : '4px',
+                      }}
+                    />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500">{t('settings.maintenanceModeHint')}</p>
+                {settings.maintenanceMode && (
+                  <div 
+                    className="mt-3 p-3 rounded-lg flex items-start gap-2"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.2)',
+                    }}
+                  >
+                    <span className="text-red-400 text-sm">⚠️ Warning: All users will see maintenance screen and cannot access the application.</span>
+                  </div>
+                )}
               </div>
             </div>
 
