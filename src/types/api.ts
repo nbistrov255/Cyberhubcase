@@ -25,6 +25,17 @@ export interface UserProfile {
   level?: number;
   currentXP?: number;
   openedCases?: number;
+  dailyStats?: {
+    deposited: number; // Сколько закинул сегодня
+    opened: number;    // Сколько открыл сегодня
+  };
+  monthlyStats?: {
+    deposited: number; // Сколько закинул за месяц
+  };
+  progress?: {
+    daily_topup_eur?: number;
+    monthly_topup_eur?: number;
+  };
 }
 
 // Auth Session

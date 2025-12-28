@@ -19,6 +19,7 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
     image_url: '',
     price_eur: 0,
     sell_price_eur: 0,
+    rarity: 'common' as 'common' | 'rare' | 'epic' | 'legendary' | 'mythic',
   });
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
         image_url: editingItem.image_url || '',
         price_eur: editingItem.price_eur || 0,
         sell_price_eur: editingItem.sell_price_eur || 0,
+        rarity: editingItem.rarity || 'common',
       });
     } else {
       setFormData({
@@ -37,6 +39,7 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
         image_url: '',
         price_eur: 0,
         sell_price_eur: 0,
+        rarity: 'common',
       });
     }
   }, [editingItem, open]);
@@ -201,6 +204,29 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
                   }}
                   min="0"
                 />
+              </div>
+
+              {/* Rarity */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Rarity
+                </label>
+                <select
+                  value={formData.rarity}
+                  onChange={(e) => setFormData({ ...formData, rarity: e.target.value as any })}
+                  className="w-full px-4 py-3 rounded-lg outline-none"
+                  style={{
+                    background: '#25252a',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#ffffff',
+                  }}
+                >
+                  <option value="common">Common</option>
+                  <option value="rare">Rare</option>
+                  <option value="epic">Epic</option>
+                  <option value="legendary">Legendary</option>
+                  <option value="mythic">Mythic</option>
+                </select>
               </div>
 
               {/* Preview */}

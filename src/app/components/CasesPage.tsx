@@ -112,8 +112,16 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
   }, []);
 
   const handleCaseClick = (caseData: CaseData) => {
-    // Блокируем клик только для авторизованных пользователей, которые уже использовали кейс
-    if (isAuthenticated && caseData.usedToday) return;
+    // Блокируем клик для авторизованных пользователей:
+    // 1. Если кейс уже использован сегодня
+    // 2. Если недостаточно депозитов
+    if (isAuthenticated) {
+      if (caseData.usedToday) return;
+      
+      const userDeposited = profile?.dailyStats?.deposited || profile?.progress?.daily_topup_eur || caseData.deposited;
+      if (userDeposited < caseData.required) return;
+    }
+    
     onCaseClick(caseData);
   };
 
@@ -162,6 +170,13 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
               filter: isLocked ? 'grayscale(0.4) brightness(0.6)' : 'none',
             }}
           />
+
+          {/* Lock Icon for Insufficient Deposit */}
+          {isLocked && (
+            <div className="absolute inset-0 flex items-center justify-center z-15">
+              <Lock className="w-16 h-16 text-white/60" strokeWidth={1.5} />
+            </div>
+          )}
 
           {/* Deposit Progress Badge - Top Right - Всегда показываем */}
           {!caseData.usedToday && (

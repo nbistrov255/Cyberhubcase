@@ -106,16 +106,58 @@ export function CaseOpening({ caseData, onOpenCase, onBack }: CaseOpeningProps) 
   const [soundOn, setSoundOn] = useState(true);
   const [fastMode, setFastMode] = useState(false);
   const [hoveredContentItem, setHoveredContentItem] = useState<string | null>(null);
+  const [wonItem, setWonItem] = useState<any>(null);
+  const [isOpening, setIsOpening] = useState(false);
 
-  const handleOpenCase = () => {
-    setIsSpinning(true);
-    setTimeout(() => {
-      setIsSpinning(false);
-    }, 13000); // Увеличили с 10500 до 13000мс
+  const handleOpenCase = async () => {
+    if (isOpening) return;
     
-    setTimeout(() => {
-      onOpenCase(); // Затем показываем pop-up с задержкой
-    }, 15500); // Задержка 2.5 секунды после остановки
+    setIsOpening(true);
+    
+    try {
+      // 1. Запрос к API для открытия кейса
+      const token = localStorage.getItem('session_token');
+      const response = await fetch('/api/cases/open', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ caseId: caseData.id }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to open case');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.prize) {
+        // 2. Сохраняем выигрышный предмет
+        setWonItem(data.prize);
+        
+        // 3. Запускаем анимацию рулетки
+        setIsSpinning(true);
+        
+        // 4. Останавливаем анимацию через 13 секунд
+        setTimeout(() => {
+          setIsSpinning(false);
+        }, 13000);
+        
+        // 5. Показываем pop-up с выигрышем через 15.5 секунд
+        setTimeout(() => {
+          onOpenCase(); // Показываем pop-up
+          setIsOpening(false);
+        }, 15500);
+      } else {
+        setIsOpening(false);
+        alert('Error opening case: ' + (data.error || 'Unknown error'));
+      }
+    } catch (error) {
+      console.error('Error opening case:', error);
+      setIsOpening(false);
+      alert('Failed to open case. Please try again.');
+    }
   };
 
   // Create extended roulette array with center focus
