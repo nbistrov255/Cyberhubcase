@@ -62,8 +62,12 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
     // Преобразовать profile.cases в CaseData[]
     const mappedCases: CaseData[] = (profile.cases || []).map((apiCase) => ({
       id: apiCase.id,
-      name: apiCase.type === 'daily' ? `Daily Case (${apiCase.threshold}€)` : `Monthly Case (${apiCase.threshold}€)`,
-      image: 'https://i.ibb.co/bRChPPVb/boxcard.png',
+      // Если есть title от бэка - берем его, иначе дефолт с ценой
+      name: apiCase.title 
+        ? `${apiCase.title} (${apiCase.threshold}€)` 
+        : (apiCase.type === 'daily' ? `Daily Case (${apiCase.threshold}€)` : `Monthly Case (${apiCase.threshold}€)`),
+      // Если есть картинка от бэка - берем её, иначе дефолт
+      image: apiCase.image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
       tier: apiCase.type === 'daily' ? 'Common' : 'Premium',
       deposited: apiCase.progress,
       required: apiCase.threshold,

@@ -12,6 +12,8 @@ export interface CaseInfo {
   threshold: number;
   available: boolean;
   progress: number;
+  title?: string; // Название из админки
+  image?: string; // Картинка из админки
 }
 
 // Profile
