@@ -100,6 +100,23 @@ export function CasesPage({ userRole }: CasesPageProps) {
 
   const handleSave = async (formData: CaseFormData) => {
     try {
+      // Преобразуем формат из UI в формат API
+      const apiPayload = {
+        id: formData.id,
+        title: formData.nameEn || formData.nameRu || formData.nameLv, // Используем английское название
+        type: formData.type,
+        threshold_eur: formData.threshold,
+        image_url: formData.image,
+        items: formData.contents?.map(item => ({
+          item_id: item.itemId,
+          weight: item.dropChance,
+          rarity: item.item.rarity,
+        })) || [],
+        status: formData.status,
+      };
+
+      console.log('Sending case data to API:', apiPayload);
+
       if (selectedCase) {
         // Обновление существующего кейса
         const response = await fetch(`/api/admin/cases/${selectedCase.id}`, {
@@ -107,11 +124,13 @@ export function CasesPage({ userRole }: CasesPageProps) {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(apiPayload),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to update case');
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to update case:', errorData);
+          throw new Error(errorData.message || 'Failed to update case');
         }
 
         const updatedCase = await response.json();
@@ -123,11 +142,13 @@ export function CasesPage({ userRole }: CasesPageProps) {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(apiPayload),
         });
 
         if (!response.ok) {
-          throw new Error('Failed to create case');
+          const errorData = await response.json().catch(() => ({}));
+          console.error('Failed to create case:', errorData);
+          throw new Error(errorData.message || 'Failed to create case');
         }
 
         const newCase = await response.json();
@@ -137,7 +158,7 @@ export function CasesPage({ userRole }: CasesPageProps) {
       closeModal();
     } catch (error) {
       console.error('Error saving case:', error);
-      alert('Failed to save case. Please try again.');
+      alert(`Failed to save case: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 

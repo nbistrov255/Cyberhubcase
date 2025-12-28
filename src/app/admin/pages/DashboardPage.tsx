@@ -2,6 +2,7 @@ import { motion } from 'motion/react';
 import { TrendingUp, FileText, AlertTriangle, Package, ArrowRight } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { AdminPage } from '../AdminApp';
+import { useEffect, useState } from 'react';
 
 interface DashboardPageProps {
   onNavigate?: (page: AdminPage) => void;
@@ -9,19 +10,57 @@ interface DashboardPageProps {
 
 export function DashboardPage({ onNavigate }: DashboardPageProps) {
   const { t } = useAdminLanguage();
+  const [dashboardData, setDashboardData] = useState({
+    casesOpened: 0,
+    pendingRequests: 0,
+    problemCases: 0,
+    lowStock: 0,
+  });
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        const token = localStorage.getItem('session_token');
+        
+        // Загружаем все данные параллельно
+        const [requestsRes] = await Promise.all([
+          fetch('/api/admin/requests?status=pending', {
+            headers: { 'Authorization': `Bearer ${token}` },
+          }),
+        ]);
+
+        const requests = requestsRes.ok ? await requestsRes.json() : [];
+
+        setDashboardData({
+          casesOpened: 0, // TODO: Add API endpoint
+          pendingRequests: Array.isArray(requests) ? requests.length : 0,
+          problemCases: 0, // TODO: Add API endpoint
+          lowStock: 0, // TODO: Add API endpoint
+        });
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      }
+    };
+
+    fetchDashboardData();
+    // Обновляем каждые 30 секунд
+    const interval = setInterval(fetchDashboardData, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const stats = [
     {
       label: t('dashboard.casesOpened'),
-      value: '1,234',
-      change: '+12%',
+      value: dashboardData.casesOpened.toString(),
+      change: '',
       period: t('dashboard.today'),
       icon: TrendingUp,
       color: '#10b981',
     },
     {
       label: t('dashboard.pendingRequests'),
-      value: '5',
+      value: dashboardData.pendingRequests.toString(),
       change: '',
       period: '',
       icon: FileText,
@@ -29,16 +68,16 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
     },
     {
       label: t('dashboard.problemCases'),
-      value: '2',
-      change: '-50%',
+      value: dashboardData.problemCases.toString(),
+      change: '',
       period: t('dashboard.thisWeek'),
       icon: AlertTriangle,
       color: '#ef4444',
     },
     {
       label: t('dashboard.lowStock'),
-      value: '8',
-      change: '+2',
+      value: dashboardData.lowStock.toString(),
+      change: '',
       period: t('dashboard.thisMonth'),
       icon: Package,
       color: '#8b5cf6',

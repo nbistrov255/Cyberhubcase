@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'motion/react';
 import { Save } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
 
@@ -53,7 +54,12 @@ export function SettingsPage({ userRole }: SettingsPageProps) {
     console.log('Settings saved:', settings);
     // Save maintenance mode to localStorage so client app can check it
     localStorage.setItem('maintenanceMode', JSON.stringify(settings.maintenanceMode));
-    // Show success notification
+    
+    // Show success toast
+    toast.success('Settings saved successfully!', {
+      description: 'All changes have been applied',
+      duration: 3000,
+    });
   };
 
   return (

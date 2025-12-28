@@ -4,14 +4,21 @@ import { Wrench, Clock } from 'lucide-react';
 export function MaintenanceScreen() {
   return (
     <div 
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{ background: '#17171c' }}
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
     >
+      {/* Blurred Background */}
+      <div 
+        className="absolute inset-0 backdrop-blur-md bg-black/80"
+        style={{
+          backgroundImage: 'radial-gradient(circle at 20% 30%, rgba(124, 45, 58, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 70%, rgba(154, 59, 74, 0.1) 0%, transparent 50%)',
+        }}
+      />
+
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="max-w-2xl w-full text-center"
+        className="max-w-2xl w-full text-center relative z-10"
       >
         {/* Icon */}
         <motion.div
@@ -43,7 +50,7 @@ export function MaintenanceScreen() {
           transition={{ delay: 0.3 }}
           className="text-5xl font-bold text-white mb-4 uppercase tracking-wider"
         >
-          Under Maintenance
+          Сайт временно недоступен
         </motion.h1>
 
         {/* Subtitle */}
@@ -53,7 +60,7 @@ export function MaintenanceScreen() {
           transition={{ delay: 0.4 }}
           className="text-xl text-gray-400 mb-8"
         >
-          The application is temporarily unavailable
+          Мы проводим технические работы, скоро вернемся
         </motion.p>
 
         {/* Description */}
@@ -61,15 +68,15 @@ export function MaintenanceScreen() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="rounded-xl p-6 mb-8"
+          className="rounded-xl p-6 mb-8 backdrop-blur-sm"
           style={{
-            background: '#1d1d22',
+            background: 'rgba(29, 29, 34, 0.6)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
           }}
         >
           <p className="text-gray-300 leading-relaxed">
-            We're currently performing scheduled maintenance to improve your experience. 
-            We'll be back online shortly. Thank you for your patience!
+            В данный момент проводятся плановые технические работы для улучшения вашего опыта.
+            Мы скоро вернемся онлайн. Спасибо за терпение!
           </p>
         </motion.div>
 
@@ -105,7 +112,7 @@ export function MaintenanceScreen() {
           transition={{ delay: 0.7 }}
           className="mt-12 text-sm text-gray-500"
         >
-          If you believe this is an error, please contact support
+          Если вы считаете, что это ошибка, пожалуйста, свяжитесь с поддержкой
         </motion.p>
       </motion.div>
     </div>

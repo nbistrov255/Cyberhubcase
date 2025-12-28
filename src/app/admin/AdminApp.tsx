@@ -9,6 +9,7 @@ import { ProblemQueuePage } from './pages/ProblemQueuePage';
 import { UsersPage } from './pages/UsersPage';
 import { LogsPage } from './pages/LogsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { AdminLanguageProvider } from './contexts/AdminLanguageContext';
 
 export type AdminPage = 
   | 'login'
@@ -55,7 +56,7 @@ export default function AdminApp() {
   };
 
   return (
-    <>
+    <AdminLanguageProvider>
       {(currentPage === 'login' || !currentUser) ? (
         <LoginPage onLogin={handleLogin} />
       ) : (
@@ -77,6 +78,6 @@ export default function AdminApp() {
           {currentPage === 'settings' && <SettingsPage userRole={currentUser.role} />}
         </AdminLayout>
       )}
-    </>
+    </AdminLanguageProvider>
   );
 }

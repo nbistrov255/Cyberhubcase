@@ -1,4 +1,4 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   LayoutDashboard, 
@@ -54,7 +54,35 @@ export function AdminLayout({
     confirmPassword: '',
   });
   const [passwordError, setPasswordError] = useState('');
-  const [pendingRequestsCount] = useState(5);
+  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
+
+  // Загрузка количества заявок
+  useEffect(() => {
+    const fetchPendingRequests = async () => {
+      try {
+        const token = localStorage.getItem('session_token');
+        const response = await fetch('/api/admin/requests?status=pending', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setPendingRequestsCount(Array.isArray(data) ? data.length : 0);
+        }
+      } catch (error) {
+        console.error('Error fetching pending requests:', error);
+        // Не показываем ошибку пользователю, просто оставляем 0
+      }
+    };
+
+    fetchPendingRequests();
+    // Обновляем каждые 30 секунд
+    const interval = setInterval(fetchPendingRequests, 30000);
+    
+    return () => clearInterval(interval);
+  }, []);
 
   interface MenuItem {
     id: AdminPage;
@@ -68,7 +96,7 @@ export function AdminLayout({
     { id: 'dashboard' as AdminPage, label: t('sidebar.dashboard'), icon: LayoutDashboard },
     { id: 'items' as AdminPage, label: t('sidebar.items'), icon: Package },
     { id: 'cases' as AdminPage, label: t('sidebar.cases'), icon: Box },
-    { id: 'requests' as AdminPage, label: t('sidebar.requests'), icon: FileText, badge: pendingRequestsCount },
+    { id: 'requests' as AdminPage, label: t('sidebar.requests'), icon: FileText, badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined },
     { id: 'problem-queue' as AdminPage, label: t('sidebar.problemQueue'), icon: AlertTriangle },
     { id: 'users' as AdminPage, label: t('sidebar.users'), icon: Users, ownerOnly: true },
     { id: 'logs' as AdminPage, label: t('sidebar.logs'), icon: FileSearch },

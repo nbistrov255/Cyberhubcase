@@ -154,163 +154,173 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
         )}
       </div>
 
-      {/* Filters */}
-      <div className="flex items-center gap-4 mb-6">
-        {/* Search */}
-        <div className="flex-1 max-w-md relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t('items.search')}
-            className="w-full pl-11 pr-4 py-2.5 rounded-lg outline-none transition-all"
+      {/* Loading State */}
+      {loading ? (
+        <div className="text-center py-20">
+          <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-white/30"></div>
+          <p className="text-gray-400 mt-4">{t('common.loading')}</p>
+        </div>
+      ) : (
+        <>
+          {/* Filters */}
+          <div className="flex items-center gap-4 mb-6">
+            {/* Search */}
+            <div className="flex-1 max-w-md relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('items.search')}
+                className="w-full pl-11 pr-4 py-2.5 rounded-lg outline-none transition-all"
+                style={{
+                  background: '#1d1d22',
+                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  color: '#ffffff',
+                }}
+              />
+            </div>
+
+            {/* Type Filter */}
+            <div className="flex gap-2">
+              {(['all', 'skin', 'physical', 'money'] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setFilterType(type)}
+                  className="px-4 py-2.5 rounded-lg font-medium transition-all"
+                  style={{
+                    background: filterType === type ? '#7c2d3a' : '#1d1d22',
+                    color: filterType === type ? '#ffffff' : '#9ca3af',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                  }}
+                >
+                  {t(`items.filter${type.charAt(0).toUpperCase() + type.slice(1)}` as any)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Items Table */}
+          <div
+            className="rounded-xl overflow-hidden"
             style={{
               background: '#1d1d22',
               border: '1px solid rgba(255, 255, 255, 0.1)',
-              color: '#ffffff',
             }}
-          />
-        </div>
-
-        {/* Type Filter */}
-        <div className="flex gap-2">
-          {(['all', 'skin', 'physical', 'money'] as const).map((type) => (
-            <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              className="px-4 py-2.5 rounded-lg font-medium transition-all"
-              style={{
-                background: filterType === type ? '#7c2d3a' : '#1d1d22',
-                color: filterType === type ? '#ffffff' : '#9ca3af',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-              }}
-            >
-              {t(`items.filter${type.charAt(0).toUpperCase() + type.slice(1)}` as any)}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Items Table */}
-      <div
-        className="rounded-xl overflow-hidden"
-        style={{
-          background: '#1d1d22',
-          border: '1px solid rgba(255, 255, 255, 0.1)',
-        }}
-      >
-        <table className="w-full">
-          <thead>
-            <tr style={{ background: '#25252a', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Image</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.name')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.type')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.price')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.sellPrice')}</th>
-              <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.lastModified')}</th>
-              <th className="px-6 py-4 text-right text-sm font-medium text-gray-400">{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            <AnimatePresence>
-              {filteredItems.map((item, index) => (
-                <motion.tr
-                  key={item.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}
-                  className="hover:bg-white/5 transition-colors"
-                >
-                  <td className="px-6 py-4">
-                    <img
-                      src={item.image_url}
-                      alt={item.title}
-                      className="w-12 h-12 rounded-lg object-cover"
-                    />
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-white font-medium">{item.title}</p>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-gray-300 capitalize">{t(`items.type${item.type.charAt(0).toUpperCase() + item.type.slice(1)}` as any)}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className="px-3 py-1 rounded-full text-sm font-medium capitalize"
-                      style={{
-                        background: '#3b82f620',
-                        color: '#3b82f6',
-                      }}
+          >
+            <table className="w-full">
+              <thead>
+                <tr style={{ background: '#25252a', borderBottom: '1px solid rgba(255, 255, 255, 0.1)' }}>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">Image</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.name')}</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.type')}</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.price')}</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.sellPrice')}</th>
+                  <th className="px-6 py-4 text-left text-sm font-medium text-gray-400">{t('items.lastModified')}</th>
+                  <th className="px-6 py-4 text-right text-sm font-medium text-gray-400">{t('common.actions')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <AnimatePresence>
+                  {filteredItems.map((item, index) => (
+                    <motion.tr
+                      key={item.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                      style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}
+                      className="hover:bg-white/5 transition-colors"
                     >
-                      {item.price_eur} €
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span
-                      className="px-3 py-1 rounded-full text-sm font-medium capitalize"
-                      style={{
-                        background: '#3b82f620',
-                        color: '#3b82f6',
-                      }}
-                    >
-                      {item.sell_price_eur} €
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-gray-400 text-sm">
-                    {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                        style={{ background: '#25252a' }}
-                        onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
-                        onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
-                      >
-                        <Eye className="w-4 h-4 text-gray-400" />
-                      </button>
-                      {canEdit && (
-                        <>
+                      <td className="px-6 py-4">
+                        <img
+                          src={item.image_url}
+                          alt={item.title}
+                          className="w-12 h-12 rounded-lg object-cover"
+                        />
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-white font-medium">{item.title}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-gray-300 capitalize">{t(`items.type${item.type.charAt(0).toUpperCase() + item.type.slice(1)}` as any)}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className="px-3 py-1 rounded-full text-sm font-medium capitalize"
+                          style={{
+                            background: '#3b82f620',
+                            color: '#3b82f6',
+                          }}
+                        >
+                          {item.price_eur} €
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className="px-3 py-1 rounded-full text-sm font-medium capitalize"
+                          style={{
+                            background: '#3b82f620',
+                            color: '#3b82f6',
+                          }}
+                        >
+                          {item.sell_price_eur} €
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-gray-400 text-sm">
+                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : 'N/A'}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => {
-                              setEditingItem(item);
-                              setShowModal(true);
-                            }}
                             className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
                             style={{ background: '#25252a' }}
                             onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
                             onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
                           >
-                            <Edit className="w-4 h-4 text-blue-400" />
+                            <Eye className="w-4 h-4 text-gray-400" />
                           </button>
-                          <button
-                            onClick={() => handleDeleteItem(item.id)}
-                            className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
-                            style={{ background: '#25252a' }}
-                            onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
-                            onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-400" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </motion.tr>
-              ))}
-            </AnimatePresence>
-          </tbody>
-        </table>
+                          {canEdit && (
+                            <>
+                              <button
+                                onClick={() => {
+                                  setEditingItem(item);
+                                  setShowModal(true);
+                                }}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                                style={{ background: '#25252a' }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
+                              >
+                                <Edit className="w-4 h-4 text-blue-400" />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteItem(item.id)}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
+                                style={{ background: '#25252a' }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
+                              >
+                                <Trash2 className="w-4 h-4 text-red-400" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </tbody>
+            </table>
 
-        {filteredItems.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-gray-400">{t('common.noData')}</p>
+            {!loading && filteredItems.length === 0 && (
+              <div className="text-center py-12">
+                <p className="text-gray-400">{t('common.noData')}</p>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </>
+      )}
 
       {/* Item Form Modal */}
       <ItemFormModal

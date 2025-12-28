@@ -85,64 +85,43 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
     contents: [],
   });
 
-  // Mock items from database
-  const [availableItems] = useState<Item[]>([
-    {
-      id: '1',
-      nameLv: 'Gaming Austiņas Pro',
-      nameRu: 'Игровые наушники Pro',
-      nameEn: 'Gaming Headset Pro',
-      type: 'physical',
-      rarity: 'legendary',
-      image: 'https://images.unsplash.com/photo-1599669454699-248893623440?w=100&h=100&fit=crop',
-      stock: 5,
-      isActive: true,
-    },
-    {
-      id: '2',
-      nameLv: '€50 Bonuss',
-      nameRu: '€50 Бонус',
-      nameEn: '€50 Bonus',
-      type: 'balance',
-      rarity: 'epic',
-      image: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=100&h=100&fit=crop',
-      stock: 0,
-      isActive: true,
-    },
-    {
-      id: '3',
-      nameLv: 'AK-47 | Redline',
-      nameRu: 'AK-47 | Redline',
-      nameEn: 'AK-47 | Redline',
-      type: 'virtual',
-      rarity: 'mythic',
-      image: 'https://images.unsplash.com/photo-1625527575307-616f0bb84ad2?w=100&h=100&fit=crop',
-      stock: 2,
-      isActive: true,
-    },
-    {
-      id: '4',
-      nameLv: '€10 Bonuss',
-      nameRu: '€10 Бонус',
-      nameEn: '€10 Bonus',
-      type: 'balance',
-      rarity: 'rare',
-      image: 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?w=100&h=100&fit=crop',
-      stock: 0,
-      isActive: true,
-    },
-    {
-      id: '5',
-      nameLv: 'Sticker Pack',
-      nameRu: 'Пак стикеров',
-      nameEn: 'Sticker Pack',
-      type: 'virtual',
-      rarity: 'common',
-      image: 'https://images.unsplash.com/photo-1614294148960-9aa740632a87?w=100&h=100&fit=crop',
-      stock: 100,
-      isActive: true,
-    },
-  ]);
+  // Load items from API
+  const [availableItems, setAvailableItems] = useState<Item[]>([]);
+  const [loadingItems, setLoadingItems] = useState(true);
+
+  useEffect(() => {
+    const fetchItems = async () => {
+      try {
+        setLoadingItems(true);
+        const response = await fetch('/api/admin/items');
+        
+        if (response.ok) {
+          const data = await response.json();
+          // Преобразуем формат API в формат компонента
+          const items: Item[] = data.map((item: any) => ({
+            id: item.id.toString(),
+            nameLv: item.title, // API возвращает только title, используем его для всех языков
+            nameRu: item.title,
+            nameEn: item.title,
+            type: item.type === 'skin' ? 'virtual' : item.type === 'money' ? 'balance' : 'physical',
+            rarity: item.rarity || 'common', // Если rarity нет, используем common
+            image: item.image_url,
+            stock: item.stock || 0,
+            isActive: true,
+          }));
+          setAvailableItems(items);
+        }
+      } catch (error) {
+        console.error('Error fetching items:', error);
+      } finally {
+        setLoadingItems(false);
+      }
+    };
+
+    if (isOpen) {
+      fetchItems();
+    }
+  }, [isOpen]);
 
   const [showAddItem, setShowAddItem] = useState(false);
 
@@ -652,7 +631,11 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
 
                           {/* Items List */}
                           <div className="p-6 space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(70vh - 140px)' }}>
-                            {availableItems.filter(item => !formData.contents?.find(ci => ci.itemId === item.id)).map(item => (
+                            {loadingItems ? (
+                              <div className="text-center py-8">
+                                <p className="text-gray-400">Loading items...</p>
+                              </div>
+                            ) : availableItems.filter(item => !formData.contents?.find(ci => ci.itemId === item.id)).map(item => (
                               <button
                                 key={item.id}
                                 type="button"
