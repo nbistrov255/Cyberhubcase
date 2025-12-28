@@ -28,141 +28,6 @@ const rarityColors = {
   mythic: '#ef4444',
 };
 
-const mockInventoryPreview = [
-  {
-    id: '1',
-    name: 'AK-47 | Fire Serpent',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'mythic' as const,
-    date: new Date('2025-11-26'),
-  },
-  {
-    id: '2',
-    name: 'M4A4 | Howl',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'legendary' as const,
-    date: new Date('2025-11-25'),
-  },
-  {
-    id: '3',
-    name: 'AWP | Dragon Lore',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'mythic' as const,
-    date: new Date('2025-11-24'),
-  },
-  {
-    id: '4',
-    name: 'Glock-18 | Fade',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'epic' as const,
-    date: new Date('2025-11-23'),
-  },
-  {
-    id: '5',
-    name: 'Desert Eagle | Blaze',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'legendary' as const,
-    date: new Date('2025-11-22'),
-  },
-  {
-    id: '6',
-    name: 'Karambit | Doppler',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'mythic' as const,
-    date: new Date('2025-11-21'),
-  },
-  {
-    id: '7',
-    name: 'M4A1-S | Hyper Beast',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'epic' as const,
-    date: new Date('2025-11-20'),
-  },
-  {
-    id: '8',
-    name: 'USP-S | Kill Confirmed',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'legendary' as const,
-    date: new Date('2025-11-19'),
-  },
-  {
-    id: '9',
-    name: 'P90 | Asiimov',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'rare' as const,
-    date: new Date('2025-11-18'),
-  },
-  {
-    id: '10',
-    name: 'Butterfly Knife | Fade',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'mythic' as const,
-    date: new Date('2025-11-17'),
-  },
-  {
-    id: '11',
-    name: 'AK-47 | Redline',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'rare' as const,
-    date: new Date('2025-11-16'),
-  },
-  {
-    id: '12',
-    name: 'AWP | Asiimov',
-    image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'epic' as const,
-    date: new Date('2025-11-15'),
-  },
-];
-
-const mockWinHistory = [
-  {
-    id: '1',
-    itemName: 'AK-47 | Fire Serpent',
-    itemImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    caseName: 'Premium Case',
-    caseImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'mythic' as const,
-    timestamp: new Date('2024-12-22T14:30:00'),
-  },
-  {
-    id: '2',
-    itemName: 'M4A4 | Asiimov',
-    itemImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    caseName: 'Silent Night Case',
-    caseImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'legendary' as const,
-    timestamp: new Date('2024-12-22T12:15:00'),
-  },
-  {
-    id: '3',
-    itemName: 'AWP | Dragon Lore',
-    itemImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    caseName: 'Legendary Case',
-    caseImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'mythic' as const,
-    timestamp: new Date('2024-12-21T18:45:00'),
-  },
-  {
-    id: '4',
-    itemName: 'Glock-18 | Fade',
-    itemImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    caseName: 'Elite Case',
-    caseImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'epic' as const,
-    timestamp: new Date('2024-12-21T10:20:00'),
-  },
-  {
-    id: '5',
-    itemName: 'Desert Eagle | Blaze',
-    itemImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    caseName: 'Premium Case',
-    caseImage: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png',
-    rarity: 'legendary' as const,
-    timestamp: new Date('2024-12-20T16:45:00'),
-  },
-];
-
 // Generate random request ID
 function generateRequestId(): string {
   return `REQ-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
@@ -722,7 +587,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                           className="absolute top-0 left-0 right-0 pointer-events-none"
                           style={{
                             height: '140px',
-                            background: `linear-gradient(to bottom, ${rarityColors[item.rarity]}50 0%, ${rarityColors[item.rarity]}30 40%, transparent 100%)`,
+                            background: `linear-gradient(to bottom, ${rarityColors[itemRarity]}50 0%, ${rarityColors[itemRarity]}30 40%, transparent 100%)`,
                             opacity: 0.6,
                           }}
                         />
@@ -743,7 +608,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                                 style={{
                                   width: '120px',
                                   height: '120px',
-                                  backgroundColor: rarityColors[item.rarity],
+                                  backgroundColor: rarityColors[itemRarity],
                                   borderRadius: '50%',
                                 }}
                               />
@@ -767,12 +632,12 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                           {/* Item Image - Centered */}
                           <div className="flex items-center justify-center" style={{ height: '110px' }}>
                             <img 
-                              src={item.image} 
-                              alt={item.name}
+                              src={itemImage} 
+                              alt={itemName}
                               className="w-36 h-36 object-contain transition-all duration-300"
                               style={{
                                 transform: isHovered ? 'scale(1.15)' : 'scale(1)',
-                                filter: isHovered ? `drop-shadow(0 0 15px ${rarityColors[item.rarity]}) brightness(1.2)` : 'none',
+                                filter: isHovered ? `drop-shadow(0 0 15px ${rarityColors[itemRarity]}) brightness(1.2)` : 'none',
                               }}
                             />
                           </div>
