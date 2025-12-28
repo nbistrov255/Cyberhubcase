@@ -20,6 +20,7 @@ export interface CaseInfo {
 export interface UserProfile {
   uuid: string;
   nickname: string;
+  balance: number; // Новое поле: Реальный баланс кошелька
   dailySum: number;
   monthlySum: number;
   cases: CaseInfo[];

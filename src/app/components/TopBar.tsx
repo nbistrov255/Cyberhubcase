@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, User, DollarSign, Trophy, Box, RotateCw, Crown, Zap, Users, Circle, Diamond, Star, Flame } from 'lucide-react';
+import { Settings, User, DollarSign, Trophy, Box, RotateCw, Crown, Zap, Users, Circle, Diamond, Star, Flame, TrendingUp } from 'lucide-react';
 import { LiveFeedItem } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
@@ -204,73 +204,66 @@ export function TopBar({
           </div>
 
           {/* Right Side */}
-          <div className="flex items-center gap-4">
-            {/* Unified Balance & Stats - только для авторизованных */}
+          <div className="flex items-center gap-3">
+            {/* Wallet Balance - компактная плашка как шестеренка */}
             {isAuthenticated && profile && (
-              <div className="flex items-center bg-[#2d5a3f] rounded-lg overflow-hidden border border-[#4a6738]/60">
-                {/* Main Balance Section */}
-                <div className="flex items-center px-3 py-2 gap-3 bg-[#3d5a2f]">
-                  <DollarSign className="w-5 h-5 text-[#8BC34A]" strokeWidth={2.5} />
-                  <div className="flex flex-col">
-                    <div className="text-xs text-[#7a9960] uppercase tracking-wider leading-tight font-medium">
-                      Balance
-                    </div>
-                    <div className="text-lg font-bold text-white leading-tight">
-                      {balance?.toFixed(2) || '0.00'} €
-                    </div>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="w-px h-10 bg-[#4a6738]/40"></div>
-
-                {/* Stats Section */}
-                <div className="flex items-center gap-3 px-3">
-                  {/* Today */}
-                  <div className="flex flex-col items-center">
-                    <div className="text-[9px] text-[#7a9960] uppercase tracking-wider leading-tight font-medium">
-                      Today
-                    </div>
-                    <div className="text-sm font-bold text-white leading-tight">
-                      {profile.progress?.daily_topup_eur?.toFixed(2) || '0.00'} €
-                    </div>
-                  </div>
-
-                  {/* Month */}
-                  <div className="flex flex-col items-center">
-                    <div className="text-[9px] text-[#7a9960] uppercase tracking-wider leading-tight font-medium">
-                      Month
-                    </div>
-                    <div className="text-sm font-bold text-white leading-tight">
-                      {profile.progress?.monthly_topup_eur?.toFixed(2) || '0.00'} €
-                    </div>
-                  </div>
-                </div>
-
-                {/* Divider */}
-                <div className="w-px h-10 bg-[#4a6738]/40"></div>
-
-                {/* Refresh Button */}
-                <button 
-                  className="px-3 h-full flex items-center justify-center hover:bg-[#4a6738]/30 transition-all disabled:opacity-50"
-                  onClick={handleRefreshClick}
-                  disabled={isRefreshing}
-                  title="Refresh Balance"
-                >
-                  <RotateCw 
-                    className={`w-4 h-4 text-[#8BC34A] transition-transform duration-1000 ${isRefreshing ? 'animate-spin' : ''}`} 
-                    strokeWidth={2.5} 
-                  />
-                </button>
+              <div 
+                className="h-10 px-3 rounded-lg bg-white/5 flex items-center gap-2 border border-white/10"
+                title="Wallet Balance"
+              >
+                <DollarSign className="w-4 h-4 text-white" strokeWidth={2.5} />
+                <span className="text-sm font-bold text-white">
+                  {profile.balance?.toFixed(2) || '0.00'} €
+                </span>
               </div>
+            )}
+
+            {/* Deposit Progress - компактная плашка */}
+            {isAuthenticated && profile && (
+              <div 
+                className="h-10 px-3 rounded-lg bg-white/5 flex items-center gap-3 border border-white/10"
+                title="Deposit Progress"
+              >
+                <TrendingUp className="w-4 h-4 text-white" strokeWidth={2.5} />
+                <div className="flex items-center gap-2 text-xs">
+                  <div className="flex flex-col items-center">
+                    <span className="text-[9px] text-gray-400 uppercase leading-tight">Today</span>
+                    <span className="text-white font-bold leading-tight">
+                      {profile.dailyStats?.deposited?.toFixed(2) || '0.00'}€
+                    </span>
+                  </div>
+                  <div className="w-px h-6 bg-white/10"></div>
+                  <div className="flex flex-col items-center">
+                    <span className="text-[9px] text-gray-400 uppercase leading-tight">Month</span>
+                    <span className="text-white font-bold leading-tight">
+                      {profile.monthlyStats?.deposited?.toFixed(2) || '0.00'}€
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Refresh Button - компактная кнопка */}
+            {isAuthenticated && (
+              <button 
+                className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors disabled:opacity-50 border border-white/10"
+                onClick={handleRefreshClick}
+                disabled={isRefreshing}
+                title="Refresh Balance"
+              >
+                <RotateCw 
+                  className={`w-4 h-4 text-white transition-transform duration-1000 ${isRefreshing ? 'animate-spin' : ''}`} 
+                  strokeWidth={2.5} 
+                />
+              </button>
             )}
 
             {/* Settings */}
             <button
               onClick={onSettingsClick}
-              className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors group"
+              className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors group border border-white/10"
             >
-              <Settings className="w-5 h-5 transition-transform duration-200 group-hover:rotate-90" />
+              <Settings className="w-5 h-5 text-white transition-transform duration-200 group-hover:rotate-90" />
             </button>
 
             {/* Login Button or Profile Avatar */}
