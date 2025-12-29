@@ -4,6 +4,7 @@ import { Search, Eye, Check, X, RotateCcw } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
 import { toast } from 'sonner';
+import { API_ENDPOINTS, getAuthHeaders } from '../../../config/api';
 
 interface Request {
   id: string;
@@ -12,6 +13,7 @@ interface Request {
     nickname: string;
     phone: string;
     uuid: string;
+    tradeLink?: string;
   };
   item: {
     name: string;
@@ -43,12 +45,9 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
   const fetchRequests = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('session_token');
       
-      const response = await fetch('/api/admin/requests', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+      const response = await fetch(API_ENDPOINTS.getRequests, {
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -65,6 +64,7 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
           nickname: req.user_nickname || 'Unknown',
           phone: req.user_phone || 'N/A',
           uuid: req.user_uuid || '',
+          tradeLink: req.trade_link || null, // ✅ Добавили Trade Link из бэкенда
         },
         item: {
           name: req.item_name || 'Unknown Item',
@@ -118,13 +118,10 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
 
   const handleApprove = async (id: string) => {
     try {
-      const token = localStorage.getItem('session_token');
-      
-      const response = await fetch(`/api/admin/requests/${id}/approve`, {
+      const response = await fetch(API_ENDPOINTS.approveRequest, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ request_id: id }),
       });
 
       if (!response.ok) {
@@ -141,13 +138,10 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
 
   const handleDeny = async (id: string) => {
     try {
-      const token = localStorage.getItem('session_token');
-      
-      const response = await fetch(`/api/admin/requests/${id}/deny`, {
+      const response = await fetch(API_ENDPOINTS.denyRequest, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ request_id: id }),
       });
 
       if (!response.ok) {
@@ -164,13 +158,10 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
 
   const handleReturn = async (id: string) => {
     try {
-      const token = localStorage.getItem('session_token');
-      
-      const response = await fetch(`/api/admin/requests/${id}/return`, {
+      const response = await fetch(API_ENDPOINTS.returnRequest, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ request_id: id }),
       });
 
       if (!response.ok) {
@@ -268,6 +259,40 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
                         <div>
                           <p className="text-white font-medium">{request.user.nickname}</p>
                           <p className="text-gray-500 text-xs">{request.user.phone}</p>
+                          {/* ✅ TRADE LINK: Кнопка COPY LINK или NO LINK */}
+                          {request.user.tradeLink ? (
+                            <button
+                              onClick={() => {
+                                navigator.clipboard.writeText(request.user.tradeLink!);
+                                toast.success('Trade Link copied to clipboard!');
+                              }}
+                              className="mt-1 px-2 py-1 rounded text-xs font-medium transition-colors"
+                              style={{
+                                background: '#10b98120',
+                                color: '#10b981',
+                                border: '1px solid #10b98140',
+                              }}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.background = '#10b98140';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.background = '#10b98120';
+                              }}
+                            >
+                              📋 COPY LINK
+                            </button>
+                          ) : (
+                            <span
+                              className="mt-1 inline-block px-2 py-1 rounded text-xs font-medium"
+                              style={{
+                                background: '#ef444420',
+                                color: '#ef4444',
+                                border: '1px solid #ef444440',
+                              }}
+                            >
+                              ⚠️ NO LINK
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="p-4">

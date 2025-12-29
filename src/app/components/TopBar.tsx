@@ -3,6 +3,7 @@ import { Settings, User, DollarSign, Trophy, Box, RotateCw, Crown, Zap, Users, C
 import { LiveFeedItem } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
+import { API_ENDPOINTS } from '../../config/api';
 
 // Заменено figma:asset импорт на прямую ссылку
 const knifeImage = "https://i.ibb.co/cXCCBcfV/unnamed.png";
@@ -119,7 +120,7 @@ export function TopBar({
   useEffect(() => {
     const fetchLiveFeed = async () => {
       try {
-        const response = await fetch('/api/stats/live');
+        const response = await fetch(API_ENDPOINTS.getRecentDrops);
         
         if (!response.ok) {
           console.error('Live feed API error:', response.status, response.statusText);

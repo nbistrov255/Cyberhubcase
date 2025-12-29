@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useAuth } from '../contexts/AuthContext';
+import { API_ENDPOINTS, getAuthHeaders } from '../../config/api';
+import { toast } from 'sonner';
 
 interface PlayerProfileProps {
   isPrivate: boolean;
@@ -155,8 +157,31 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     }
   };
 
-  const handleSaveTradeLink = () => {
-    setIsEditingTradeLink(false);
+  const handleSaveTradeLink = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.updateTradeLink, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ trade_link: tradeLink })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to update trade link');
+      }
+
+      const result = await response.json();
+      
+      if (result.success) {
+        toast.success('Trade Link saved successfully!');
+        setIsEditingTradeLink(false);
+      } else {
+        toast.error('Failed to save Trade Link');
+      }
+    } catch (error: any) {
+      console.error('Error saving trade link:', error);
+      toast.error(error.message || 'Failed to save Trade Link');
+    }
   };
 
   const handleClaimItem = (itemId: string) => {

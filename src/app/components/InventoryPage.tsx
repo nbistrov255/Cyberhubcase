@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Search, Loader2 } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useLanguage } from '../contexts/LanguageContext';
+import { useAuth } from '../contexts/AuthContext';
+import { API_ENDPOINTS, getAuthHeaders } from '../../config/api';
 import { toast } from 'sonner';
 
 interface InventoryItem {
@@ -14,6 +16,7 @@ interface InventoryItem {
   sell_price_eur: number;
   price_eur: number;
   created_at: string;
+  status?: 'available' | 'processing' | 'received';
 }
 
 interface InventoryPageProps {
@@ -22,11 +25,12 @@ interface InventoryPageProps {
 
 export function InventoryPage({ onBack }: InventoryPageProps) {
   const { t } = useLanguage();
+  const { refreshProfile } = useAuth();
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'skin' | 'physical'>('all');
+  const [filterType, setFilterType] = useState<'all' | 'skin' | 'physical' | 'money'>('all');
 
   useEffect(() => {
     fetchInventory();
@@ -35,12 +39,9 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('session_token');
       
-      const response = await fetch('/api/inventory', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+      const response = await fetch(API_ENDPOINTS.getInventory, {
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -49,9 +50,8 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
 
       const data = await response.json();
       
-      // Filter out money type items (they are auto-added to balance)
-      const filteredItems = data.items.filter((item: InventoryItem) => item.type !== 'money');
-      setItems(filteredItems);
+      // ✅ НЕ ФИЛЬТРУЕМ ДЕНЬГИ - показываем ВСЕ предметы
+      setItems(data.items || []);
     } catch (error) {
       console.error('Error fetching inventory:', error);
       toast.error(t('inventory.errorLoading'));
@@ -62,14 +62,9 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
 
   const handleSellItem = async (inventoryId: number, sellPrice: number, title: string) => {
     try {
-      const token = localStorage.getItem('session_token');
-      
-      const response = await fetch('/api/inventory/sell', {
+      const response = await fetch(API_ENDPOINTS.sellItem, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({ inventory_id: inventoryId }),
       });
 
@@ -85,12 +80,73 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
         
         // Show success notification
         toast.success(`${t('inventory.itemSold')} ${sellPrice}€`);
+        
+        // Refresh profile to update balance
+        await refreshProfile();
       } else {
         toast.error(t('inventory.errorSelling'));
       }
     } catch (error) {
       console.error('Error selling item:', error);
       toast.error(t('inventory.errorSelling'));
+    }
+  };
+
+  // ✅ НОВАЯ ФУНКЦИЯ: Забрать предмет (CLAIM)
+  const handleClaimItem = async (inventoryId: number, type: string) => {
+    try {
+      // 1. Отправляем запрос
+      const response = await fetch(API_ENDPOINTS.claimItem, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ inventory_id: inventoryId }),
+      });
+
+      const result = await response.json();
+
+      // 2. Обработка ошибки Трейд-ссылки (Backend вернет 400 + error: "TRADE_LINK_MISSING")
+      if (!response.ok && result.error === 'TRADE_LINK_MISSING') {
+        toast.error("Set your Trade Link in Profile first!");
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to claim item');
+      }
+
+      // 3. Успех
+      if (result.success) {
+        if (type === 'money') {
+          // Деньги зачисляются мгновенно -> Обновляем баланс
+          toast.success(result.message || "Balance added successfully!");
+          
+          // Удаляем предмет из списка
+          setItems(prevItems => prevItems.filter(item => item.inventory_id !== inventoryId));
+          
+          // Обновляем профиль для актуализации баланса
+          await refreshProfile();
+          
+          // Опционально: перезагрузка через 1 секунду
+          setTimeout(() => {
+            fetchInventory();
+          }, 1000);
+        } else {
+          // Скины уходят в заявку -> Ставим статус processing
+          toast.success("Request sent to Admin! Wait up to 60 minutes.");
+          
+          // Обнови локальный стейт, чтобы показать статус processing
+          setItems(prevItems => 
+            prevItems.map(item => 
+              item.inventory_id === inventoryId 
+                ? { ...item, status: 'processing' }
+                : item
+            )
+          );
+        }
+      }
+    } catch (error: any) {
+      console.error('Error claiming item:', error);
+      toast.error(error.message || 'Failed to claim item');
     }
   };
 
@@ -152,7 +208,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
 
           {/* Type Filter */}
           <div className="flex gap-2">
-            {(['all', 'skin', 'physical'] as const).map((type) => (
+            {(['all', 'skin', 'physical', 'money'] as const).map((type) => (
               <button
                 key={type}
                 onClick={() => setFilterType(type)}
@@ -206,46 +262,94 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
 
-                    {/* Hover Overlay with Sell Button */}
+                    {/* Hover Overlay with Action Buttons */}
                     <AnimatePresence>
-                      {hoveredItem === item.inventory_id && (
+                      {hoveredItem === item.inventory_id && item.status !== 'processing' && (
                         <motion.div
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="absolute inset-0 flex items-center justify-center"
+                          className="absolute inset-0 flex items-center justify-center gap-3"
                           style={{
                             background: 'rgba(0, 0, 0, 0.8)',
                             backdropFilter: 'blur(4px)',
                           }}
                         >
+                          {/* ✅ КНОПКА SELL - скрыта для type === 'money' */}
+                          {item.type !== 'money' && (
+                            <motion.button
+                              initial={{ scale: 0.9 }}
+                              animate={{ scale: 1 }}
+                              exit={{ scale: 0.9 }}
+                              onClick={() => handleSellItem(item.inventory_id, item.sell_price_eur, item.title)}
+                              className="px-6 py-3 rounded-lg font-bold uppercase transition-all"
+                              style={{
+                                background: '#7c2d3a',
+                                color: '#ffffff',
+                                border: '2px solid #9a3b4a',
+                              }}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                            >
+                              SELL {item.sell_price_eur}€
+                            </motion.button>
+                          )}
+
+                          {/* ✅ КНОПКА CLAIM - видна для ВСЕХ типов */}
                           <motion.button
                             initial={{ scale: 0.9 }}
                             animate={{ scale: 1 }}
                             exit={{ scale: 0.9 }}
-                            onClick={() => handleSellItem(item.inventory_id, item.sell_price_eur, item.title)}
-                            className="px-8 py-4 rounded-lg font-bold uppercase transition-all"
+                            onClick={() => handleClaimItem(item.inventory_id, item.type)}
+                            className="px-6 py-3 rounded-lg font-bold uppercase transition-all"
                             style={{
-                              background: '#7c2d3a',
+                              background: '#10b981',
                               color: '#ffffff',
-                              border: '2px solid #9a3b4a',
+                              border: '2px solid #059669',
                             }}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                           >
-                            {t('inventory.sell')} {item.sell_price_eur}€
+                            CLAIM
                           </motion.button>
                         </motion.div>
                       )}
                     </AnimatePresence>
 
+                    {/* Processing Status Overlay */}
+                    {item.status === 'processing' && (
+                      <div
+                        className="absolute inset-0 flex items-center justify-center"
+                        style={{
+                          background: 'rgba(0, 0, 0, 0.8)',
+                          backdropFilter: 'blur(4px)',
+                        }}
+                      >
+                        <div className="text-center">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" style={{ color: '#10b981' }} />
+                          <p className="text-white font-bold">PROCESSING</p>
+                          <p className="text-xs text-gray-400 mt-1">Wait for admin</p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Type Badge */}
                     <div
                       className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold uppercase"
                       style={{
-                        background: item.type === 'skin' ? '#3b82f620' : '#8b5cf620',
-                        color: item.type === 'skin' ? '#3b82f6' : '#8b5cf6',
-                        border: `1px solid ${item.type === 'skin' ? '#3b82f640' : '#8b5cf640'}`,
+                        background: 
+                          item.type === 'skin' ? '#3b82f620' : 
+                          item.type === 'money' ? '#10b98120' : 
+                          '#8b5cf620',
+                        color: 
+                          item.type === 'skin' ? '#3b82f6' : 
+                          item.type === 'money' ? '#10b981' : 
+                          '#8b5cf6',
+                        border: `1px solid ${
+                          item.type === 'skin' ? '#3b82f640' : 
+                          item.type === 'money' ? '#10b98140' : 
+                          '#8b5cf640'
+                        }`,
                       }}
                     >
                       {t(`inventory.type${item.type.charAt(0).toUpperCase() + item.type.slice(1)}`)}
@@ -260,12 +364,14 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                         <p className="text-xs text-gray-500">{t('inventory.marketPrice')}</p>
                         <p className="text-white font-bold">{item.price_eur}€</p>
                       </div>
-                      <div className="text-right">
-                        <p className="text-xs text-gray-500">{t('inventory.sellPrice')}</p>
-                        <p className="font-bold" style={{ color: '#7c2d3a' }}>
-                          {item.sell_price_eur}€
-                        </p>
-                      </div>
+                      {item.type !== 'money' && (
+                        <div className="text-right">
+                          <p className="text-xs text-gray-500">{t('inventory.sellPrice')}</p>
+                          <p className="font-bold" style={{ color: '#7c2d3a' }}>
+                            {item.sell_price_eur}€
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>
