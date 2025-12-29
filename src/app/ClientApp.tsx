@@ -219,6 +219,7 @@ function ClientAppContent() {
         )}
         {currentPage === 'case-open' && selectedCase && (
           <CaseOpenPage
+            caseId={selectedCase.id}
             caseName={selectedCase.name}
             caseImage={selectedCase.image}
             deposited={selectedCase.deposited}

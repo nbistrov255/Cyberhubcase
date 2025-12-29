@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Volume2, VolumeX, X, Gift, Crown, Flame, Diamond, Star, Sparkles, Lock } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useLanguage } from '../contexts/LanguageContext';
+import { API_ENDPOINTS, getAuthHeaders } from '../../config/api';
+import { toast } from 'sonner';
 
 interface CaseItem {
   id: string;
@@ -14,6 +16,7 @@ interface CaseItem {
 }
 
 interface CaseOpenPageProps {
+  caseId: string;
   caseName: string;
   caseImage: string;
   deposited: number;
@@ -41,30 +44,24 @@ const rarityIcons = {
   Mythic: Flame,
 };
 
-// Mock case contents
-const mockCaseContents: CaseItem[] = [
-  { id: '1', name: 'Redline', type: 'AK-47', image: 'https://i.ibb.co/wN8mzF3j/3a201c1d-000c-42aa-80b1-5affd33b70c4-sized-1000x1000.png', rarity: 'Mythic', chance: 0.26 },
-  { id: '2', name: 'Howl', type: 'M4A4', image: 'https://i.ibb.co/cXCCBcfV/unnamed.png', rarity: 'Legendary', chance: 0.64 },
-  { id: '3', name: 'Dragon Lore', type: 'AWP', image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png', rarity: 'Mythic', chance: 0.13 },
-  { id: '4', name: 'Fade', type: 'Karambit', image: 'https://i.ibb.co/c9JRDpG/12143-b.png', rarity: 'Legendary', chance: 0.86 },
-  { id: '5', name: 'Water Elemental', type: 'Glock-18', image: 'https://i.ibb.co/cXCCBcfV/unnamed.png', rarity: 'Epic', chance: 2.54 },
-  { id: '6', name: 'Blaze', type: 'Desert Eagle', image: 'https://i.ibb.co/wN8mzF3j/3a201c1d-000c-42aa-80b1-5affd33b70c4-sized-1000x1000.png', rarity: 'Epic', chance: 3.19 },
-  { id: '7', name: 'Asiimov', type: 'P90', image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png', rarity: 'Rare', chance: 7.98 },
-  { id: '8', name: 'Kill Confirmed', type: 'USP-S', image: 'https://i.ibb.co/c9JRDpG/12143-b.png', rarity: 'Rare', chance: 9.45 },
-  { id: '9', name: 'Skulls', type: 'MP7', image: 'https://i.ibb.co/cXCCBcfV/unnamed.png', rarity: 'Common', chance: 15.82 },
-  { id: '10', name: 'See Ya Later', type: 'P250', image: 'https://i.ibb.co/wN8mzF3j/3a201c1d-000c-42aa-80b1-5affd33b70c4-sized-1000x1000.png', rarity: 'Common', chance: 18.67 },
-  { id: '11', name: 'Neon Rider', type: 'MAC-10', image: 'https://i.ibb.co/bMXcgsWP/1385599722-preview-Phase-4-BF.png', rarity: 'Rare', chance: 11.23 },
-  { id: '12', name: 'Hyper Beast', type: 'Five-SeveN', image: 'https://i.ibb.co/c9JRDpG/12143-b.png', rarity: 'Epic', chance: 4.67 },
-  { id: '13', name: 'Fuel Injector', type: 'Tec-9', image: 'https://i.ibb.co/wN8mzF3j/3a201c1d-000c-42aa-80b1-5affd33b70c4-sized-1000x1000.png', rarity: 'Rare', chance: 8.92 },
-  { id: '14', name: 'Pole Position', type: 'CZ75-Auto', image: 'https://i.ibb.co/cXCCBcfV/unnamed.png', rarity: 'Common', chance: 15.64 },
-];
+// Map API rarity to UI rarity
+const mapRarity = (apiRarity: string): 'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Mythic' => {
+  const normalized = apiRarity.toLowerCase();
+  if (normalized.includes('mythic')) return 'Mythic';
+  if (normalized.includes('legendary')) return 'Legendary';
+  if (normalized.includes('epic')) return 'Epic';
+  if (normalized.includes('rare')) return 'Rare';
+  return 'Common';
+};
 
-export function CaseOpenPage({ caseName, caseImage, deposited, required, isAuthenticated, onBack, onClose, onWin, onRequestLogin }: CaseOpenPageProps) {
+export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required, isAuthenticated, onBack, onClose, onWin, onRequestLogin }: CaseOpenPageProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rouletteItems, setRouletteItems] = useState<CaseItem[]>([]);
   const [offset, setOffset] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [caseContents, setCaseContents] = useState<CaseItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // Для гостей всегда показываем deposited = 0
   const displayedDeposited = isAuthenticated ? deposited : 0;
@@ -73,27 +70,73 @@ export function CaseOpenPage({ caseName, caseImage, deposited, required, isAuthe
 
   // Rarity order for sorting (best to worst)
   const rarityOrder = {
-    'Legendary': 1,
-    'Mythic': 2,
+    'Mythic': 1,
+    'Legendary': 2,
     'Epic': 3,
     'Rare': 4,
     'Common': 5,
   };
 
+  // Load case contents from API
+  useEffect(() => {
+    const fetchCaseContents = async () => {
+      try {
+        console.log('📦 Loading case contents for ID:', caseId);
+        const response = await fetch(API_ENDPOINTS.getCaseById(caseId), {
+          headers: getAuthHeaders(),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to load case contents');
+        }
+
+        const data = await response.json();
+        console.log('📦 Case data received:', data);
+
+        if (data.success && data.case && data.case.contents) {
+          const mappedContents: CaseItem[] = data.case.contents.map((item: any) => ({
+            id: item.id || item.item_id || String(Math.random()),
+            name: item.name || item.item_name || 'Unknown Item',
+            type: item.type || item.item_type || 'Item',
+            image: item.image || item.item_image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
+            rarity: mapRarity(item.rarity || 'Common'),
+            chance: parseFloat(item.chance || item.drop_chance || '0'),
+          }));
+
+          console.log('📦 Mapped case contents:', mappedContents);
+          setCaseContents(mappedContents);
+        } else {
+          console.warn('⚠️ No case contents in response, using empty array');
+          setCaseContents([]);
+        }
+      } catch (error) {
+        console.error('❌ Error loading case contents:', error);
+        toast.error('Failed to load case contents');
+        setCaseContents([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCaseContents();
+  }, [caseId]);
+
   // Sort case contents by rarity
-  const sortedCaseContents = [...mockCaseContents].sort((a, b) => {
+  const sortedCaseContents = [...caseContents].sort((a, b) => {
     return rarityOrder[a.rarity] - rarityOrder[b.rarity];
   });
 
-  // Generate roulette items on mount
+  // Generate roulette items when case contents are loaded
   useEffect(() => {
+    if (caseContents.length === 0) return;
+
     const items: CaseItem[] = [];
     for (let i = 0; i < 100; i++) {
-      const randomItem = mockCaseContents[Math.floor(Math.random() * mockCaseContents.length)];
+      const randomItem = caseContents[Math.floor(Math.random() * caseContents.length)];
       items.push({ ...randomItem, id: `roulette-${i}` });
     }
     setRouletteItems(items);
-  }, []);
+  }, [caseContents]);
 
   const handleOpen = async () => {
     if (!canOpen || isSpinning) return;
@@ -101,27 +144,32 @@ export function CaseOpenPage({ caseName, caseImage, deposited, required, isAuthe
     setIsSpinning(true);
     
     try {
-      // Отправляем запрос на сервер для открытия кейса
-      const response = await fetch('http://localhost:3000/api/cases/open', {
+      console.log('🎰 Opening case:', caseId);
+      const response = await fetch(API_ENDPOINTS.openCase, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: getAuthHeaders(),
         body: JSON.stringify({
-          caseName: caseName,
-          // Можно добавить дополнительные параметры, если требуется
-          // userId: userId, // если есть система авторизации
+          case_id: caseId,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to open case');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to open case');
       }
 
       const data = await response.json();
+      console.log('🎰 Case opened, result:', data);
       
-      // Используем полученный приз из сервера
-      const winningItem = data.prize || mockCaseContents[Math.floor(Math.random() * mockCaseContents.length)];
+      // Map the winning item from API
+      const winningItem: CaseItem = {
+        id: data.item?.id || data.item?.item_id || String(Date.now()),
+        name: data.item?.name || data.item?.item_name || 'Unknown Item',
+        type: data.item?.type || data.item?.item_type || 'Item',
+        image: data.item?.image || data.item?.item_image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
+        rarity: mapRarity(data.item?.rarity || 'Common'),
+        chance: parseFloat(data.item?.chance || data.item?.drop_chance || '0'),
+      };
       
       // Calculate final position (center on winning item)
       const itemWidth = 200;
@@ -149,14 +197,25 @@ export function CaseOpenPage({ caseName, caseImage, deposited, required, isAuthe
         setIsSpinning(false);
         onWin(winningItem);
       }, 5000);
-    } catch (error) {
-      console.error('Error opening case:', error);
+    } catch (error: any) {
+      console.error('❌ Error opening case:', error);
       setIsSpinning(false);
-      alert('Failed to open case. Please try again.');
+      toast.error(error.message || 'Failed to open case. Please try again.');
     }
   };
 
   const { t } = useLanguage();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#17171c] flex items-center justify-center">
+        <div className="text-center">
+          <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#7c2d3a]"></div>
+          <p className="mt-4 text-gray-400">Loading case contents...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#17171c] pb-12">
@@ -408,108 +467,114 @@ export function CaseOpenPage({ caseName, caseImage, deposited, required, isAuthe
           </motion.h2>
 
           {/* Content Grid */}
-          <div className="grid grid-cols-6 gap-4">
-            {sortedCaseContents.map((item) => {
-              const [isHovered, setIsHovered] = useState(false);
+          {sortedCaseContents.length === 0 ? (
+            <div className="text-center py-12">
+              <p className="text-gray-400 text-lg">No items in this case</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-6 gap-4">
+              {sortedCaseContents.map((item) => {
+                const [isHovered, setIsHovered] = useState(false);
 
-              return (
-                <motion.div
-                  key={item.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  onMouseEnter={() => setIsHovered(true)}
-                  onMouseLeave={() => setIsHovered(false)}
-                  className="relative rounded-lg overflow-hidden transition-all duration-200 cursor-pointer"
-                  style={{
-                    backgroundColor: '#1a1f26',
-                    border: isHovered ? `1px solid ${rarityColors[item.rarity].glow.replace('0.6', '0.8')}` : '1px solid #2d3339',
-                    boxShadow: isHovered 
-                      ? `0 8px 32px ${rarityColors[item.rarity].glow}`
-                      : 'none',
-                  }}
-                >
-                  {/* Soft Glow Background on Hover */}
-                  <AnimatePresence>
-                    {isHovered && (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 0.15 }}
-                        exit={{ opacity: 0 }}
-                        className="absolute inset-0 flex items-center justify-center"
-                        style={{
-                          filter: 'blur(40px)',
-                        }}
-                      >
-                        <div 
-                          style={{
-                            width: '100px',
-                            height: '100px',
-                            backgroundColor: rarityColors[item.rarity].glow.replace('0.6', '1'),
-                            borderRadius: '50%',
-                          }}
-                        />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* Chance Badge */}
-                  <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 rounded text-xs font-bold text-gray-300 z-10">
-                    {item.chance.toFixed(2)}%
-                  </div>
-
-                  {/* Geometric Background Figure */}
-                  <div 
-                    className="absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-300"
+                return (
+                  <motion.div
+                    key={item.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    onMouseEnter={() => setIsHovered(true)}
+                    onMouseLeave={() => setIsHovered(false)}
+                    className="relative rounded-lg overflow-hidden transition-all duration-200 cursor-pointer"
                     style={{
-                      filter: 'brightness(1.5)',
-                      opacity: isHovered ? 0.5 : 0.25,
-                      transform: isHovered ? 'scale(1.15)' : 'scale(1)',
+                      backgroundColor: '#1a1f26',
+                      border: isHovered ? `1px solid ${rarityColors[item.rarity].glow.replace('0.6', '0.8')}` : '1px solid #2d3339',
+                      boxShadow: isHovered 
+                        ? `0 8px 32px ${rarityColors[item.rarity].glow}`
+                        : 'none',
                     }}
                   >
-                    <img 
-                      src="https://i.ibb.co/FbfsZ36L/free-icon-geometric-10363376.png"
-                      alt=""
-                      className="w-32 h-32 object-contain"
+                    {/* Soft Glow Background on Hover */}
+                    <AnimatePresence>
+                      {isHovered && (
+                        <motion.div
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 0.15 }}
+                          exit={{ opacity: 0 }}
+                          className="absolute inset-0 flex items-center justify-center"
+                          style={{
+                            filter: 'blur(40px)',
+                          }}
+                        >
+                          <div 
+                            style={{
+                              width: '100px',
+                              height: '100px',
+                              backgroundColor: rarityColors[item.rarity].glow.replace('0.6', '1'),
+                              borderRadius: '50%',
+                            }}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    {/* Chance Badge */}
+                    <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 rounded text-xs font-bold text-gray-300 z-10">
+                      {item.chance.toFixed(2)}%
+                    </div>
+
+                    {/* Geometric Background Figure */}
+                    <div 
+                      className="absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-300"
                       style={{
-                        filter: `drop-shadow(0 0 20px ${rarityColors[item.rarity].stripe})`,
-                        opacity: 0.6,
+                        filter: 'brightness(1.5)',
+                        opacity: isHovered ? 0.5 : 0.25,
+                        transform: isHovered ? 'scale(1.15)' : 'scale(1)',
                       }}
-                    />
-                  </div>
-
-                  {/* Item Content */}
-                  <div className="relative z-10 p-4 flex flex-col items-center">
-                    {/* Type */}
-                    <p className="text-[10px] text-white/60 uppercase tracking-wider mb-2">
-                      {item.type}
-                    </p>
-
-                    {/* Item Image */}
-                    <div className="w-full aspect-square flex items-center justify-center mb-3">
+                    >
                       <img 
-                        src={item.image} 
-                        alt={item.name}
-                        className="w-full h-full object-contain"
+                        src="https://i.ibb.co/FbfsZ36L/free-icon-geometric-10363376.png"
+                        alt=""
+                        className="w-32 h-32 object-contain"
+                        style={{
+                          filter: `drop-shadow(0 0 20px ${rarityColors[item.rarity].stripe})`,
+                          opacity: 0.6,
+                        }}
                       />
                     </div>
 
-                    {/* Name */}
-                    <p className="font-bold text-sm text-center text-white mb-2">
-                      {item.name}
-                    </p>
+                    {/* Item Content */}
+                    <div className="relative z-10 p-4 flex flex-col items-center">
+                      {/* Type */}
+                      <p className="text-[10px] text-white/60 uppercase tracking-wider mb-2">
+                        {item.type}
+                      </p>
 
-                    {/* Quality Stripe - Same as Roulette */}
-                    <div 
-                      className="w-16 h-0.5 mb-1"
-                      style={{
-                        backgroundColor: rarityColors[item.rarity].stripe,
-                      }}
-                    />
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
+                      {/* Item Image */}
+                      <div className="w-full aspect-square flex items-center justify-center mb-3">
+                        <img 
+                          src={item.image} 
+                          alt={item.name}
+                          className="w-full h-full object-contain"
+                        />
+                      </div>
+
+                      {/* Name */}
+                      <p className="font-bold text-sm text-center text-white mb-2">
+                        {item.name}
+                      </p>
+
+                      {/* Quality Stripe - Same as Roulette */}
+                      <div 
+                        className="w-16 h-0.5 mb-1"
+                        style={{
+                          backgroundColor: rarityColors[item.rarity].stripe,
+                        }}
+                      />
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
