@@ -54,6 +54,103 @@ const mapRarity = (apiRarity: string): 'Common' | 'Rare' | 'Epic' | 'Legendary' 
   return 'Common';
 };
 
+// ✅ НОВЫЙ КОМПОНЕНТ ДЛЯ КАРТОЧКИ (Исправляет ошибку useState в цикле)
+function CaseItemCard({ item }: { item: CaseItem }) {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="relative rounded-lg overflow-hidden transition-all duration-200 cursor-pointer"
+      style={{
+        backgroundColor: '#1a1f26',
+        border: isHovered ? `1px solid ${rarityColors[item.rarity].glow.replace('0.6', '0.8')}` : '1px solid #2d3339',
+        boxShadow: isHovered ? `0 8px 32px ${rarityColors[item.rarity].glow}` : 'none',
+      }}
+    >
+      {/* Soft Glow Background on Hover */}
+      <AnimatePresence>
+        {isHovered && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.15 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 flex items-center justify-center"
+            style={{ filter: 'blur(40px)' }}
+          >
+            <div 
+              style={{
+                width: '100px',
+                height: '100px',
+                backgroundColor: rarityColors[item.rarity].glow.replace('0.6', '1'),
+                borderRadius: '50%',
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Chance Badge */}
+      <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 rounded text-xs font-bold text-gray-300 z-10">
+        {item.chance.toFixed(2)}%
+      </div>
+
+      {/* Geometric Background Figure */}
+      <div 
+        className="absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-300"
+        style={{
+          filter: 'brightness(1.5)',
+          opacity: isHovered ? 0.5 : 0.25,
+          transform: isHovered ? 'scale(1.15)' : 'scale(1)',
+        }}
+      >
+        <img 
+          src="https://i.ibb.co/FbfsZ36L/free-icon-geometric-10363376.png"
+          alt=""
+          className="w-32 h-32 object-contain"
+          style={{
+            filter: `drop-shadow(0 0 20px ${rarityColors[item.rarity].stripe})`,
+            opacity: 0.6,
+          }}
+        />
+      </div>
+
+      {/* Item Content */}
+      <div className="relative z-10 p-4 flex flex-col items-center">
+        {/* Type */}
+        <p className="text-[10px] text-white/60 uppercase tracking-wider mb-2">
+          {item.type}
+        </p>
+
+        {/* Item Image */}
+        <div className="w-full aspect-square flex items-center justify-center mb-3">
+          <img 
+            src={item.image} 
+            alt={item.name}
+            className="w-full h-full object-contain"
+          />
+        </div>
+
+        {/* Name */}
+        <p className="font-bold text-sm text-center text-white mb-2">
+          {item.name}
+        </p>
+
+        {/* Quality Stripe - Same as Roulette */}
+        <div 
+          className="w-16 h-0.5 mb-1"
+          style={{
+            backgroundColor: rarityColors[item.rarity].stripe,
+          }}
+        />
+      </div>
+    </motion.div>
+  );
+}
+
 export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required, isAuthenticated, onBack, onClose, onWin, onRequestLogin }: CaseOpenPageProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
@@ -479,106 +576,9 @@ export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required,
             </div>
           ) : (
             <div className="grid grid-cols-6 gap-4">
-              {sortedCaseContents.map((item) => {
-                const [isHovered, setIsHovered] = useState(false);
-
-                return (
-                  <motion.div
-                    key={item.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    onMouseEnter={() => setIsHovered(true)}
-                    onMouseLeave={() => setIsHovered(false)}
-                    className="relative rounded-lg overflow-hidden transition-all duration-200 cursor-pointer"
-                    style={{
-                      backgroundColor: '#1a1f26',
-                      border: isHovered ? `1px solid ${rarityColors[item.rarity].glow.replace('0.6', '0.8')}` : '1px solid #2d3339',
-                      boxShadow: isHovered 
-                        ? `0 8px 32px ${rarityColors[item.rarity].glow}`
-                        : 'none',
-                    }}
-                  >
-                    {/* Soft Glow Background on Hover */}
-                    <AnimatePresence>
-                      {isHovered && (
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 0.15 }}
-                          exit={{ opacity: 0 }}
-                          className="absolute inset-0 flex items-center justify-center"
-                          style={{
-                            filter: 'blur(40px)',
-                          }}
-                        >
-                          <div 
-                            style={{
-                              width: '100px',
-                              height: '100px',
-                              backgroundColor: rarityColors[item.rarity].glow.replace('0.6', '1'),
-                              borderRadius: '50%',
-                            }}
-                          />
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-
-                    {/* Chance Badge */}
-                    <div className="absolute top-2 right-2 px-2 py-1 bg-black/60 rounded text-xs font-bold text-gray-300 z-10">
-                      {item.chance.toFixed(2)}%
-                    </div>
-
-                    {/* Geometric Background Figure */}
-                    <div 
-                      className="absolute inset-0 flex items-center justify-center pointer-events-none transition-all duration-300"
-                      style={{
-                        filter: 'brightness(1.5)',
-                        opacity: isHovered ? 0.5 : 0.25,
-                        transform: isHovered ? 'scale(1.15)' : 'scale(1)',
-                      }}
-                    >
-                      <img 
-                        src="https://i.ibb.co/FbfsZ36L/free-icon-geometric-10363376.png"
-                        alt=""
-                        className="w-32 h-32 object-contain"
-                        style={{
-                          filter: `drop-shadow(0 0 20px ${rarityColors[item.rarity].stripe})`,
-                          opacity: 0.6,
-                        }}
-                      />
-                    </div>
-
-                    {/* Item Content */}
-                    <div className="relative z-10 p-4 flex flex-col items-center">
-                      {/* Type */}
-                      <p className="text-[10px] text-white/60 uppercase tracking-wider mb-2">
-                        {item.type}
-                      </p>
-
-                      {/* Item Image */}
-                      <div className="w-full aspect-square flex items-center justify-center mb-3">
-                        <img 
-                          src={item.image} 
-                          alt={item.name}
-                          className="w-full h-full object-contain"
-                        />
-                      </div>
-
-                      {/* Name */}
-                      <p className="font-bold text-sm text-center text-white mb-2">
-                        {item.name}
-                      </p>
-
-                      {/* Quality Stripe - Same as Roulette */}
-                      <div 
-                        className="w-16 h-0.5 mb-1"
-                        style={{
-                          backgroundColor: rarityColors[item.rarity].stripe,
-                        }}
-                      />
-                    </div>
-                  </motion.div>
-                );
-              })}
+              {sortedCaseContents.map((item) => (
+                <CaseItemCard key={item.id} item={item} />
+              ))}
             </div>
           )}
         </div>
