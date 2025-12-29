@@ -11,7 +11,7 @@ export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://91.107.120.
 export const API_ENDPOINTS = {
   // Auth
   createSession: `${API_BASE}/api/auth/session`,
-  getProfile: `${API_BASE}/api/me`,
+  getProfile: `${API_BASE}/api/profile`,
   logout: `${API_BASE}/api/auth/logout`,
   
   // Cases

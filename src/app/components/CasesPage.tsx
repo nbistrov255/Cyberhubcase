@@ -146,6 +146,13 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
     // 📦 ОТЛАДКА: Показываем сырые данные с сервера
     console.log('📦 Raw Cases from Profile:', profile.cases);
 
+    // ⚠️ ПРОВЕРКА: Если массив кейсов пустой
+    if (profile.cases.length === 0) {
+      console.warn('⚠️ Profile cases are empty array');
+      setLoading(false);
+      return;
+    }
+
     // УЛУЧШЕННЫЙ МАППИНГ: Нормализация типа для защиты от опечаток
     const mappedCases: CaseData[] = (profile.cases || []).map((apiCase: any) => {
       // Нормализация типа: lowercase + trim для защиты от пробелов и регистра
@@ -167,16 +174,16 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
 
       return {
         id: apiCase.id,
-        // Формируем имя с ценой используя поле threshold
-        name: apiCase.title 
-          ? `${apiCase.title} (${apiCase.threshold}€)` 
+        // Формируем имя с ценой используя поля title (или nameEn) и threshold
+        name: apiCase.title || apiCase.nameEn
+          ? `${apiCase.title || apiCase.nameEn} (${apiCase.threshold}€)` 
           : (normalizedType.includes('daily')
               ? `Daily Case (${apiCase.threshold}€)` 
               : normalizedType.includes('monthly')
                 ? `Monthly Case (${apiCase.threshold}€)`
                 : `Event Case (${apiCase.threshold}€)`),
         
-        // Используем поле image напрямую
+        // Используем поле image напрямую с fallback
         image: apiCase.image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
         tier: tier,
         
