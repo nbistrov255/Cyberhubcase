@@ -266,25 +266,33 @@ export function TopBar({
             {!isAuthenticated ? (
               // Кнопка авторизации - зеленая с градиентом
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileTap={{ scale: 0.98 }}
                 onClick={onLoginClick}
-                className="px-5 h-10 rounded-lg flex items-center gap-2 transition-all duration-300 font-bold uppercase text-sm tracking-wider relative overflow-hidden"
+                className="px-5 h-10 rounded-lg flex items-center gap-2 transition-all duration-300 font-bold uppercase text-sm tracking-wider relative overflow-hidden group"
                 style={{
                   background: 'linear-gradient(135deg, rgba(74, 222, 128, 0.15) 0%, rgba(34, 197, 94, 0.25) 100%)',
                   border: '1px solid rgba(74, 222, 128, 0.3)',
                   boxShadow: '0 0 20px rgba(74, 222, 128, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
                 }}
               >
-                {/* Градиентный блеск на hover */}
-                <motion.div
-                  className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300"
+                {/* Градиентный overlay на hover */}
+                <div
+                  className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(74, 222, 128, 0.2) 0%, rgba(34, 197, 94, 0.3) 100%)',
+                    background: 'linear-gradient(135deg, rgba(74, 222, 128, 0.25) 0%, rgba(34, 197, 94, 0.35) 100%)',
                   }}
                 />
-                <User className="w-5 h-5 text-[#4ade80] relative z-10" />
-                <span className="text-[#4ade80] relative z-10">Sign In</span>
+                
+                {/* Анимированное свечение границы на hover */}
+                <div
+                  className="absolute inset-0 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                  style={{
+                    boxShadow: '0 0 30px rgba(74, 222, 128, 0.4), inset 0 0 20px rgba(74, 222, 128, 0.1)',
+                  }}
+                />
+                
+                <User className="w-5 h-5 text-[#4ade80] relative z-10 group-hover:text-[#22c55e] transition-colors duration-300" />
+                <span className="text-[#4ade80] relative z-10 group-hover:text-[#22c55e] transition-colors duration-300">Sign In</span>
               </motion.button>
             ) : (
               // Profile Avatar with Level для авторизованных
