@@ -229,14 +229,14 @@ export function TopBar({
                   <div className="flex flex-col items-center">
                     <span className="text-[9px] text-gray-400 uppercase leading-tight">Today</span>
                     <span className="text-white font-bold leading-tight">
-                      {profile.dailyStats?.deposited?.toFixed(2) || '0.00'}€
+                      {(profile.dailySum || 0).toFixed(2)}€
                     </span>
                   </div>
                   <div className="w-px h-6 bg-white/10"></div>
                   <div className="flex flex-col items-center">
                     <span className="text-[9px] text-gray-400 uppercase leading-tight">Month</span>
                     <span className="text-white font-bold leading-tight">
-                      {profile.monthlyStats?.deposited?.toFixed(2) || '0.00'}€
+                      {(profile.monthlySum || 0).toFixed(2)}€
                     </span>
                   </div>
                 </div>
