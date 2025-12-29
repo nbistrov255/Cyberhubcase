@@ -93,23 +93,35 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
     const fetchItems = async () => {
       try {
         setLoadingItems(true);
-        const response = await fetch('/api/admin/items');
+        const token = localStorage.getItem('session_token');
+        const response = await fetch('/api/admin/items', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
         
         if (response.ok) {
           const data = await response.json();
-          // Преобразуем формат API в формат компонента
-          const items: Item[] = (data || []).map((item: any) => ({
-            id: item.id.toString(),
-            nameLv: item.title, // API возвращает только title, используем его для всех языков
-            nameRu: item.title,
-            nameEn: item.title,
-            type: item.type === 'skin' ? 'virtual' : item.type === 'money' ? 'balance' : 'physical',
-            rarity: item.rarity || 'common', // Если rarity нет, используем common
-            image: item.image_url,
-            stock: item.stock ?? -1, // Если stock нет, используем -1 (бесконечно)
-            isActive: true,
-          }));
-          setAvailableItems(items);
+          
+          // --- ИСПРАВЛЕНИЕ: Backend возвращает { success: true, items: [...] } ---
+          const rawItems = data.items || data || [];
+          
+          if (Array.isArray(rawItems)) {
+            const items: Item[] = rawItems.map((item: any) => ({
+              id: item.id.toString(),
+              nameLv: item.title, // API возвращает только title, используем его для всех языков
+              nameRu: item.title,
+              nameEn: item.title,
+              type: item.type === 'skin' ? 'virtual' : item.type === 'money' ? 'balance' : 'physical',
+              rarity: item.rarity || 'common', // Если rarity нет, используем common
+              image: item.image_url,
+              stock: item.stock ?? -1, // Если stock нет, используем -1 (бесконечно)
+              isActive: true,
+            }));
+            setAvailableItems(items);
+          } else {
+            setAvailableItems([]);
+          }
         }
       } catch (error) {
         console.error('Error fetching items:', error);

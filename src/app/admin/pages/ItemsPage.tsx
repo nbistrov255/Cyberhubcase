@@ -14,6 +14,7 @@ interface Item {
   price_eur: number;
   sell_price_eur: number;
   stock: number;
+  rarity?: string;
   created_at?: string;
 }
 
@@ -38,19 +39,35 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/items');
+      const token = localStorage.getItem('session_token');
+      const response = await fetch('/api/admin/items', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch items');
       }
 
       const data = await response.json();
-      // Безопасная установка данных - всегда массив
-      setItems(Array.isArray(data) ? data : []);
+      
+      // --- ИСПРАВЛЕНИЕ: Backend возвращает { success: true, items: [...] } ---
+      if (data.items && Array.isArray(data.items)) {
+        setItems(data.items);
+      } else if (Array.isArray(data)) {
+        // На случай, если формат сервера изменится на прямой массив
+        setItems(data);
+      } else {
+        console.warn('Unexpected items format:', data);
+        setItems([]);
+      }
+      // ------------------------
+
     } catch (error) {
       console.error('Error fetching items:', error);
       toast.error('Failed to load items');
-      setItems([]); // Устанавливаем пустой массив в случае ошибки
+      setItems([]); 
     } finally {
       setLoading(false);
     }
