@@ -46,7 +46,7 @@ const rarityIcons = {
 
 // Map API rarity to UI rarity
 const mapRarity = (apiRarity: string): 'Common' | 'Rare' | 'Epic' | 'Legendary' | 'Mythic' => {
-  const normalized = apiRarity.toLowerCase();
+  const normalized = (apiRarity || 'common').toLowerCase();
   if (normalized.includes('mythic')) return 'Mythic';
   if (normalized.includes('legendary')) return 'Legendary';
   if (normalized.includes('epic')) return 'Epic';
@@ -93,20 +93,24 @@ export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required,
         const data = await response.json();
         console.log('📦 Case data received:', data);
 
-        if (data.success && data.case && data.case.contents) {
-          const mappedContents: CaseItem[] = data.case.contents.map((item: any) => ({
+        // ИСПРАВЛЕНИЕ: Берем contents из корня, а не из data.case
+        const rawContents = data.contents || data.case?.contents || [];
+
+        if (rawContents.length > 0) {
+          const mappedContents: CaseItem[] = rawContents.map((item: any) => ({
             id: item.id || item.item_id || String(Math.random()),
-            name: item.name || item.item_name || 'Unknown Item',
-            type: item.type || item.item_type || 'Item',
-            image: item.image || item.item_image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
+            // ИСПРАВЛЕНИЕ: Бэкенд шлет title, а не name
+            name: item.title || item.name || 'Unknown Item',
+            type: item.type || 'Item',
+            // ИСПРАВЛЕНИЕ: Бэкенд шлет image_url, а не image
+            image: item.image_url || item.image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
             rarity: mapRarity(item.rarity || 'Common'),
-            chance: parseFloat(item.chance || item.drop_chance || '0'),
+            chance: parseFloat(item.chance || '0'),
           }));
 
-          console.log('📦 Mapped case contents:', mappedContents);
           setCaseContents(mappedContents);
         } else {
-          console.warn('⚠️ No case contents in response, using empty array');
+          console.warn('⚠️ No case contents in response');
           setCaseContents([]);
         }
       } catch (error) {
@@ -149,26 +153,26 @@ export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required,
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({
-          case_id: caseId,
+          caseId: caseId, // Исправил case_id на caseId (как в бэкенде)
         }),
       });
 
+      const data = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to open case');
+        throw new Error(data.message || data.error || 'Failed to open case');
       }
 
-      const data = await response.json();
       console.log('🎰 Case opened, result:', data);
       
       // Map the winning item from API
       const winningItem: CaseItem = {
-        id: data.item?.id || data.item?.item_id || String(Date.now()),
-        name: data.item?.name || data.item?.item_name || 'Unknown Item',
-        type: data.item?.type || data.item?.item_type || 'Item',
-        image: data.item?.image || data.item?.item_image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
+        id: data.item?.id || String(Date.now()),
+        name: data.item?.name || data.item?.title || 'Unknown Item',
+        type: data.item?.type || 'Item',
+        image: data.item?.image || data.item?.image_url || 'https://i.ibb.co/bRChPPVb/boxcard.png',
         rarity: mapRarity(data.item?.rarity || 'Common'),
-        chance: parseFloat(data.item?.chance || data.item?.drop_chance || '0'),
+        chance: 0, // Не важно для выигрыша
       };
       
       // Calculate final position (center on winning item)
@@ -196,6 +200,8 @@ export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required,
       setTimeout(() => {
         setIsSpinning(false);
         onWin(winningItem);
+        // Обновляем баланс после прокрутки (перезагрузка страницы через 1с)
+        setTimeout(() => window.location.reload(), 1000);
       }, 5000);
     } catch (error: any) {
       console.error('❌ Error opening case:', error);
@@ -445,7 +451,7 @@ export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required,
                   cursor: canOpen && !isSpinning ? 'pointer' : 'not-allowed',
                 }}
               >
-                {isSpinning ? t('caseOpen.opening') : canOpen ? t('caseOpen.openCase') : `ADD ${missingAmount.toFixed(2)} $ TO OPEN`}
+                {isSpinning ? t('caseOpen.opening') : canOpen ? t('caseOpen.openCase') : `ADD ${missingAmount.toFixed(2)}€ TO OPEN`}
               </motion.button>
             )}
           </div>
