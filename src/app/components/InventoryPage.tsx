@@ -31,6 +31,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
   const [hoveredItem, setHoveredItem] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState<'all' | 'skin' | 'physical' | 'money'>('all');
+  const [processingId, setProcessingId] = useState<number | null>(null);
 
   useEffect(() => {
     fetchInventory();
@@ -39,21 +40,18 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      
-      const response = await fetch(API_ENDPOINTS.getInventory, {
-        headers: getAuthHeaders(),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch inventory');
-      }
-
+      const response = await fetch(API_ENDPOINTS.getInventory, { headers: getAuthHeaders() });
+      if (!response.ok) throw new Error('Failed');
       const data = await response.json();
-      
-      // ✅ НЕ ФИЛЬТРУЕМ ДЕНЬГИ - показываем ВСЕ предметы
-      setItems(data.items || []);
+      // Нормализация данных
+      const rawItems = Array.isArray(data) ? data : (data.items || []);
+      const normalizedItems = rawItems.map((item: any) => ({
+        ...item,
+        inventory_id: item.id,
+        price_eur: item.price_eur || item.amount_eur || 0,
+      }));
+      setItems(normalizedItems); // БЕЗ .filter()
     } catch (error) {
-      console.error('Error fetching inventory:', error);
       toast.error(t('inventory.errorLoading'));
     } finally {
       setLoading(false);
@@ -92,61 +90,41 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
     }
   };
 
-  // ✅ НОВАЯ ФУНКЦИЯ: Забрать предмет (CLAIM)
-  const handleClaimItem = async (inventoryId: number, type: string) => {
+  // Новая логика CLAIM (вставь вместо старой)
+  const handleClaimItem = async (itemId: number, type: string) => {
+    if (processingId) return;
+    setProcessingId(itemId);
     try {
-      // 1. Отправляем запрос
       const response = await fetch(API_ENDPOINTS.claimItem, {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ inventory_id: inventoryId }),
+        body: JSON.stringify({ inventory_id: itemId }),
       });
-
       const result = await response.json();
 
-      // 2. Обработка ошибки Трейд-ссылки (Backend вернет 400 + error: "TRADE_LINK_MISSING")
-      if (!response.ok && result.error === 'TRADE_LINK_MISSING') {
-        toast.error("Set your Trade Link in Profile first!");
-        return;
-      }
-
       if (!response.ok) {
-        throw new Error(result.message || 'Failed to claim item');
+        if (result.error === 'TRADE_LINK_MISSING') {
+          toast.error('Please set your Trade Link in Profile first!');
+          return;
+        }
+        throw new Error(result.error);
       }
 
-      // 3. Успех
       if (result.success) {
         if (type === 'money') {
-          // Деньги зачисляются мгновенно -> Обновляем баланс
-          toast.success(result.message || "Balance added successfully!");
-          
-          // Удаляем предмет из списка
-          setItems(prevItems => prevItems.filter(item => item.inventory_id !== inventoryId));
-          
-          // Обновляем профиль для актуализации баланса
-          await refreshProfile();
-          
-          // Опционально: перезагрузка через 1 секунду
-          setTimeout(() => {
-            fetchInventory();
-          }, 1000);
+           toast.success(result.message || 'Balance added!');
+           setItems(prev => prev.filter(i => i.inventory_id !== itemId));
+           // Перезагрузка для обновления баланса в шапке
+           setTimeout(() => window.location.reload(), 1000); 
         } else {
-          // Скины уходят в заявку -> Ставим статус processing
-          toast.success("Request sent to Admin! Wait up to 60 minutes.");
-          
-          // Обнови локальный стейт, чтобы показать статус processing
-          setItems(prevItems => 
-            prevItems.map(item => 
-              item.inventory_id === inventoryId 
-                ? { ...item, status: 'processing' }
-                : item
-            )
-          );
+           toast.success('Request sent to Admin!');
+           setItems(prev => prev.map(i => i.inventory_id === itemId ? { ...i, status: 'processing' } : i));
         }
       }
-    } catch (error: any) {
-      console.error('Error claiming item:', error);
-      toast.error(error.message || 'Failed to claim item');
+    } catch (error) {
+      toast.error('Failed to claim');
+    } finally {
+      setProcessingId(null);
     }
   };
 

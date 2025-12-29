@@ -66,6 +66,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
   const { profile } = useAuth();
   const [tradeLink, setTradeLink] = useState('https://steamcommunity.com/tradeoffer/new/?partner=123456789&token=abcdef');
   const [isEditingTradeLink, setIsEditingTradeLink] = useState(false);
+  const [isSavingLink, setIsSavingLink] = useState(false);
   const [showLevelsModal, setShowLevelsModal] = useState(false);
   const [claimRequests, setClaimRequests] = useState<ClaimRequest[]>([]);
   const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
@@ -158,29 +159,22 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
   };
 
   const handleSaveTradeLink = async () => {
+    setIsSavingLink(true);
     try {
-      const response = await fetch(API_ENDPOINTS.updateTradeLink, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ trade_link: tradeLink })
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Failed to update trade link');
-      }
-
-      const result = await response.json();
-      
-      if (result.success) {
+        const response = await fetch(API_ENDPOINTS.updateTradeLink, {
+            method: 'POST',
+            headers: getAuthHeaders(),
+            body: JSON.stringify({ trade_link: tradeLink }),
+        });
+        
+        if (!response.ok) throw new Error('Failed to save');
+        
         toast.success('Trade Link saved successfully!');
         setIsEditingTradeLink(false);
-      } else {
+    } catch (e) {
         toast.error('Failed to save Trade Link');
-      }
-    } catch (error: any) {
-      console.error('Error saving trade link:', error);
-      toast.error(error.message || 'Failed to save Trade Link');
+    } finally {
+        setIsSavingLink(false);
     }
   };
 
