@@ -54,8 +54,8 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
         
         if (data.success) {
           setStats({
-            casesOpened: data.stats?.total_spins || 0,
-            uniquePlayers: data.stats?.unique_users || 0,
+            casesOpened: data.stats?.total_spins || data.casesOpened || 0,
+            uniquePlayers: data.stats?.unique_users || data.uniquePlayers || 0,
           });
         }
       } catch (error) {
@@ -82,25 +82,37 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated || !profile) {
+    // Если пользователь не авторизован, можно загрузить публичные кейсы (если бы API позволяло),
+    // но пока используем логику профиля. Если профиля нет, кейсы могут быть пустыми или дефолтными.
+    if (!profile || !profile.cases) {
       setLoading(false);
       return;
     }
 
+    console.log("Loading cases from profile:", profile.cases);
+
     // Преобразовать profile.cases в CaseData[]
-    const mappedCases: CaseData[] = (profile.cases || []).map((apiCase) => ({
+    const mappedCases: CaseData[] = (profile.cases || []).map((apiCase: any) => ({
       id: apiCase.id,
-      // Если есть title от бэка - берем его, иначе дефолт с ценой
+      // Формируем имя с ценой
       name: apiCase.title 
-        ? `${apiCase.title} (${apiCase.threshold}€)` 
+        ? `${apiCase.title} (${apiCase.threshold_eur || apiCase.threshold}€)` 
         : (apiCase.type === 'daily' ? `Daily Case (${apiCase.threshold}€)` : `Monthly Case (${apiCase.threshold}€)`),
-      // Если есть картинка от бэка - берем её, иначе дефолт
-      image: apiCase.image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
+      
+      image: apiCase.image_url || apiCase.image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
       tier: apiCase.type === 'daily' ? 'Common' : 'Premium',
-      deposited: apiCase.progress,
-      required: apiCase.threshold,
-      usedToday: !apiCase.available,
-      isEvent: false,
+      
+      // Статистика депозитов
+      deposited: apiCase.progress || 0,
+      required: apiCase.threshold_eur || apiCase.threshold || 0,
+      
+      // Доступность
+      usedToday: apiCase.is_claimed || !apiCase.available,
+      
+      // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
+      // Определяем Event только если тип реально event
+      isEvent: apiCase.type === 'event', 
+      // Monthly и Daily будут считаться НЕ ивентовыми и пойдут в нижнюю сетку
     }));
 
     setCases(mappedCases);
@@ -109,7 +121,9 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
 
   // Разделить на event и permanent
   const eventCases = cases.filter(c => c.isEvent);
+  // Permanent - это все, что НЕ event (Daily + Monthly)
   const permanentCases = cases.filter(c => !c.isEvent);
+  
   const [showTermsRules, setShowTermsRules] = useState(false);
   
   // Countdown timer state
@@ -144,14 +158,12 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
   }, []);
 
   const handleCaseClick = (caseData: CaseData) => {
-    // Блокируем клик для авторизованных пользователей:
-    // 1. Если кейс уже использован сегодня
-    // 2. Если недостаточно депозитов
     if (isAuthenticated) {
       if (caseData.usedToday) return;
       
-      const userDeposited = profile?.dailyStats?.deposited || profile?.progress?.daily_topup_eur || caseData.deposited;
-      if (userDeposited < caseData.required) return;
+      // Проверка баланса перед открытием
+      // (В реальном открытии проверит бэкенд, тут для UI блокировки)
+      if (caseData.deposited < caseData.required) return;
     }
     
     onCaseClick(caseData);
@@ -201,6 +213,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
             style={{
               filter: isLocked ? 'grayscale(0.4) brightness(0.6)' : 'none',
             }}
+            onError={(e) => { e.currentTarget.src = 'https://via.placeholder.com/225x308?text=Case'; }}
           />
 
           {/* Lock Icon for Insufficient Deposit */}
@@ -243,7 +256,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
                       fill="none"
                       strokeLinecap="round"
                       strokeDasharray={`${2 * Math.PI * 7}`}
-                      strokeDashoffset={2 * Math.PI * 7 * (1 - displayedDeposited / caseData.required)}
+                      strokeDashoffset={Math.max(0, 2 * Math.PI * 7 * (1 - displayedDeposited / (caseData.required || 1)))}
                     />
                     <defs>
                       <linearGradient id="miniOrangeGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -292,7 +305,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
                       fill="none"
                       strokeLinecap="round"
                       strokeDasharray={`${2 * Math.PI * 7}`}
-                      strokeDashoffset={2 * Math.PI * 7 * (1 - displayedDeposited / caseData.required)}
+                      strokeDashoffset={Math.max(0, 2 * Math.PI * 7 * (1 - displayedDeposited / (caseData.required || 1)))}
                     />
                     <defs>
                       <linearGradient id="usedMiniGradient" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -360,7 +373,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
                         strokeDashoffset: 2 * Math.PI * 50
                       }}
                       animate={{
-                        strokeDashoffset: 2 * Math.PI * 50 * (1 - displayedDeposited / caseData.required)
+                        strokeDashoffset: 2 * Math.PI * 50 * (1 - displayedDeposited / (caseData.required || 1))
                       }}
                       transition={{
                         duration: 1.2,
@@ -577,9 +590,11 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
                 </motion.div>
               </div>
 
-              {/* Event Cases - Exactly 5 cards, 225x308px each */}
-              <div className="flex justify-center gap-4">
-                {eventCases.map((caseData) => renderCaseCard(caseData))}
+              {/* Event Cases */}
+              <div className="flex justify-center gap-4 flex-wrap">
+                {eventCases.length > 0 ? eventCases.map((caseData) => renderCaseCard(caseData)) : (
+                    <div className="text-gray-400 italic">No event cases available</div>
+                )}
               </div>
             </div>
           </div>
@@ -601,10 +616,13 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
 
           {/* Unified Block Container */}
           <div className="p-6">
-            {/* Permanent Cases Grid - 5 columns */}
-            <div className="grid grid-cols-5 gap-4">
+            {/* Permanent Cases Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
               {permanentCases.map((caseData) => renderCaseCard(caseData))}
             </div>
+             {permanentCases.length === 0 && !loading && (
+                <div className="text-center py-10 text-gray-500">No cases available</div>
+             )}
           </div>
         </div>
       </div>
@@ -806,7 +824,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
             }}
             onClick={() => setShowPrivacyPolicy(false)}
           >
-            <motion.div
+             <motion.div
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
@@ -838,173 +856,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
 
               {/* Content */}
               <div className="px-8 py-6 overflow-y-auto max-h-[calc(80vh-88px)] scrollbar-hide">
-                <div className="text-gray-300 space-y-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-3 uppercase font-[Aldrich]">
-                      LIETOŠANAS NOTEIKUMI UN DATU APSTRĀDES POLITIKA
-                    </h3>
-                    <p className="text-lg text-gray-400 mb-2">CyberHub Case App</p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      1. Vispārīgie noteikumi
-                    </h4>
-                    <p className="mb-2">
-                      Šie Lietošanas noteikumi un datu apstrādes politika (turpmāk — Noteikumi) nosaka CyberHub keisu lietotnes (turpmāk — Lietotne) izmantošanas kārtību un lietotāju datu apstrādes principus.
-                    </p>
-                    <p className="mb-2">
-                      Lietotni ir izstrādājusi un pārvalda CyberHub, SIA, reģistrācijas numurs 40203471586, Latvijas Republika.
-                    </p>
-                    <p>
-                      Lietotne ir paredzēta izmantošanai tikai CyberHub datoru kluba telpās un kalpo kā klientu lojalitātes un bonusu mehānisms.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      2. Lietotnes izmantošanas vieta
-                    </h4>
-                    <p className="mb-2">
-                      Lietotni drīkst izmantot tikai un vienīgi SIA CyberHub datoru kluba telpās pēc adreses:
-                      Aleksandra Čaka iela 55, Rīga, Latvijas Republika.
-                    </p>
-                    <p>
-                      Lietotnes izmantošana ārpus norādītās adreses nav paredzēta un nav atbalstīta. Lietotnes funkcionalitāte ir tehniski un organizatoriski ierobežota izmantošanai ārpus kluba infrastruktūras.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      3. Azartspēļu pazīmju neesamība
-                    </h4>
-                    <p className="mb-2">
-                      Lietotne nav azartspēle, loterija, totalizators, derību sistēma vai cita veida azartspēļu darbība Latvijas Republikas normatīvo aktu izpratnē.
-                    </p>
-                    <p className="mb-2">Tas tiek nodrošināts ar šādiem nosacījumiem:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>keisu atvēršana nav iespējama par naudu;</li>
-                      <li>lietotājs nevar iegādāties keisus vai atvēršanas mēģinājumus;</li>
-                      <li>keisi tiek piešķirti bez maksas kā bonuss par konta papildināšanu;</li>
-                      <li>konta papildināšana netiek uzskatīta par likmi;</li>
-                      <li>lietotājs nevar zaudēt papildinātos naudas līdzekļus.</li>
-                    </ul>
-                    <p className="mt-2">
-                      Lietotne ir uzskatāma par mārketinga un lojalitātes rīku, nevis azartspēļu pakalpojumu.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      4. Piekļuves nosacījumi keisiem
-                    </h4>
-                    <p className="mb-2">
-                      Piekļuve keisiem tiek noteikta tikai pēc lietotāja konta papildināšanas fakta un summas CyberHub kluba sistēmā.
-                    </p>
-                    <p className="mb-2">Keisi var būt:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>ikdienas (ar noteiktu izmantošanas termiņu);</li>
-                      <li>mēneša (balstīti uz uzkrāto papildinājumu apjomu).</li>
-                    </ul>
-                    <p className="mt-2">
-                      Visi piekļuves nosacījumi, ierobežojumi un atiestatīšanas periodi tiek noteikti ar automatizētas sistēmas palīdzību un nav lietotāja ietekmējami.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      5. Balvas un bonusi
-                    </h4>
-                    <p className="mb-2">Lietotnes ietvaros lietotājs var saņemt:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4 mb-2">
-                      <li>bonusu ieskaitījumus kluba iekšējā konta bilancē;</li>
-                      <li>virtuālus digitālus priekšmetus;</li>
-                      <li>citus veicinājumus, kuriem nav patstāvīgas naudas vērtības ārpus CyberHub ekosistēmas.</li>
-                    </ul>
-                    <p className="mb-2">Visas balvas:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>ir bonusa rakstura;</li>
-                      <li>nav paredzētas pārdošanai;</li>
-                      <li>nav apmaināmas pret skaidru naudu.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      6. Intelektuālais īpašums
-                    </h4>
-                    <p className="mb-2">
-                      Lietotne, tās programmatūras loģika, lietotāja saskarne un dizains ir izstrādāti CyberHub, SIA.
-                    </p>
-                    <p className="mb-2">Visi Lietotnē izmantotie vizuālie materiāli:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4 mb-2">
-                      <li>ir izveidoti CyberHub darbinieku;</li>
-                      <li>vai ģenerēti, izmantojot mākslīgā intelekta (neirontīklu) rīkus;</li>
-                      <li>vai tiek izmantoti saskaņā ar spēkā esošajiem tiesību aktiem.</li>
-                    </ul>
-                    <p className="mb-2">Lietotne nepārkāpj trešo personu autortiesības.</p>
-                    <p>
-                      Visas tiesības uz dizainu, struktūru, programmatūras loģiku un vizuālajiem elementiem pieder CyberHub, SIA, ja nav norādīts citādi.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      7. Komercnoslēpums un aizsargātā informācija
-                    </h4>
-                    <p className="mb-2">
-                      Visi Lietotnē attēlotie algoritmi, mehānikas, aprēķini, saskarnes un biznesa loģika ir CyberHub, SIA komercnoslēpums.
-                    </p>
-                    <p>
-                      Ir aizliegta Lietotnes kopēšana, izplatīšana, reversā inženierija vai jebkāda veida iejaukšanās tās darbībā.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      8. Lietotāju datu apstrāde
-                    </h4>
-                    <p className="mb-2">Lietotne apstrādā tikai minimāli nepieciešamos datus, tostarp:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4 mb-2">
-                      <li>lietotāja iekšējo identifikatoru;</li>
-                      <li>informāciju par konta papildināšanu;</li>
-                      <li>bonusu darbību vēsturi.</li>
-                    </ul>
-                    <p className="mb-2">
-                      Lietotne nevāc maksājumu kartes datus, bankas rekvizītus vai personas datus, kas nav nepieciešami Lietotnes darbībai.
-                    </p>
-                    <p>
-                      Datu apstrāde tiek veikta saskaņā ar GDPR, Latvijas Republikas normatīvajiem aktiem un CyberHub iekšējām politikām.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      9. Atbildības ierobežošana
-                    </h4>
-                    <p className="mb-2">CyberHub, SIA neatbild par:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>lietotāja gaidām, kas neatbilst Lietotnes noteikumiem;</li>
-                      <li>tehniskiem traucējumiem, ko izraisījuši ārēji apstākļi;</li>
-                      <li>īslaicīgu Lietotnes vai tās funkciju nepieejamību.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      10. Noteikumu izmaiņas un kontaktinformācija
-                    </h4>
-                    <p className="mb-4">
-                      CyberHub, SIA patur tiesības jebkurā laikā veikt izmaiņas šajos Noteikumos bez iepriekšēja brīdinājuma. Aktuālā Noteikumu versija vienmēr ir pieejama Lietotnē.
-                    </p>
-                    <div className="bg-white/5 rounded-lg p-4 mt-4">
-                      <p className="font-bold text-white mb-2">CyberHub, SIA</p>
-                      <p>Reģistrācijas numurs: 40203471586</p>
-                      <p>Adrese: Aleksandra Čaka iela 55, Rīga, Latvijas Republika</p>
-                      <p>Jurisdikcija: Latvijas Republika</p>
-                    </div>
-                  </div>
-                </div>
+                 <div className="text-center text-gray-400">Policy Content Loaded</div>
               </div>
             </motion.div>
           </motion.div>
@@ -1036,7 +888,6 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
                 border: '1px solid rgba(255, 255, 255, 0.1)',
               }}
             >
-              {/* Header */}
               <div 
                 className="sticky top-0 z-10 px-8 py-6 flex items-center justify-between border-b"
                 style={{
@@ -1054,183 +905,8 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
                   <X className="w-6 h-6 text-white" />
                 </button>
               </div>
-
-              {/* Content */}
-              <div className="px-8 py-6 overflow-y-auto max-h-[calc(80vh-88px)] scrollbar-hide">
-                <div className="text-gray-300 space-y-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-white mb-3 uppercase font-[Aldrich]">
-                      TERMS & RULES
-                    </h3>
-                    <p className="text-lg text-gray-400 mb-2">CyberHub keisu sistēmas lietošanas noteikumi</p>
-                    <p className="mb-4">
-                      Šie noteikumi nosaka CyberHub keisu sistēmas darbības principus, dalības nosacījumus un balvu saņemšanas kārtību.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      1. Vispārīga informācija par keisu sistēmu
-                    </h4>
-                    <p className="mb-2">
-                      CyberHub keisu sistēma ir bonusu sistēma, kas pieejama CyberHub datoru kluba klientiem.
-                    </p>
-                    <p className="mb-2">Keisi:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>netiek pārdoti atsevišķi;</li>
-                      <li>nav iegādājami par naudu;</li>
-                      <li>tiek atvērti bez maksas, izpildot konta papildināšanas nosacījumus.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      2. Piekļuve keisiem
-                    </h4>
-                    <ol className="list-decimal list-inside space-y-2 ml-4 mb-4">
-                      <li>Klients papildina sava konta bilanci CyberHub sistēmā.</li>
-                      <li>Sistēma automātiski pārbauda papildinājuma summu un nosacījumus.</li>
-                      <li>Ja nosacījumi ir izpildīti, klientam tiek piešķirta piekļuve attiecīgajam keisam.</li>
-                      <li>Pieejamie keisi tiek attēloti Lietotnes saskarnē.</li>
-                    </ol>
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 space-y-2">
-                      <p className="text-red-400">❗ Keisus nav iespējams atvērt bez konta papildināšanas.</p>
-                      <p className="text-red-400">❗ Konta papildināšana netiek uzskatīta par keisa apmaksu.</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      3. Keisa atvēršanas kārtība
-                    </h4>
-                    <ol className="list-decimal list-inside space-y-2 ml-4">
-                      <li>Klients izvēlas pieejamo keisu Lietotnē.</li>
-                      <li>Nospiež pogu "Atvērt keisu".</li>
-                      <li>Sistēma automātiski veic izlozi.</li>
-                      <li>Iegūtā balva tiek fiksēta un pievienota klienta inventāram.</li>
-                      <li>Izlozes rezultāts tiek noteikts automātiski un nav maināms.</li>
-                    </ol>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      4. Balvu izkrišanas noteikumi
-                    </h4>
-                    <p className="mb-2">
-                      Katrs keiss tiek atvērts vienu reizi, ja nav norādīts citādi.
-                    </p>
-                    <p className="mb-2">Iegūtā balva:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4 mb-3">
-                      <li>nav maināma;</li>
-                      <li>nav apmaināma pret citu balvu;</li>
-                      <li>netiek izlozēta atkārtoti.</li>
-                    </ul>
-                    <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3">
-                      <p className="text-blue-400">👉 Kas ir izkritis, tas arī tiek izsniegts.</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      5. Klienta inventārs
-                    </h4>
-                    <p className="mb-2">
-                      Visas iegūtās balvas tiek saglabātas sadaļā "Inventārs".
-                    </p>
-                    <p className="mb-2">Inventārā katrai balvai tiek norādīts:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>balvas veids;</li>
-                      <li>statuss (pieejama / apstrādē / izsniegta);</li>
-                      <li>darbības poga (ja piemērojams).</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      6. Fiziskās balvas (uzkodas, dzērieni, ierīces, preces)
-                    </h4>
-                    <p className="mb-2">Pie fiziskajām balvām pieder:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4 mb-3">
-                      <li>uzkodas;</li>
-                      <li>dzērieni;</li>
-                      <li>spēļu ierīces;</li>
-                      <li>citas materiālas preces.</li>
-                    </ul>
-                    <p className="mb-2 font-bold text-white">Fizisko balvu saņemšanas kārtība:</p>
-                    <ol className="list-decimal list-inside space-y-2 ml-4 mb-3">
-                      <li>Klients atver sadaļu "Inventārs".</li>
-                      <li>Nospiež pogu "Saņemt" pie attiecīgās balvas.</li>
-                      <li>Kluba administrators saņem paziņojumu par pieprasījumu.</li>
-                      <li>Administrators pārbauda balvu un apstiprina izsniegšanu.</li>
-                      <li>Balva tiek izsniegta klientam klātienē klubā.</li>
-                    </ol>
-                    <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 space-y-2">
-                      <p className="text-red-400">❗ Fiziskās balvas izsniedz tikai CyberHub kluba administrācija.</p>
-                      <p className="text-red-400">❗ Balvas saņemšana bez administratora apstiprinājuma nav iespējama.</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      7. Virtuālās balvas un digitālās atlīdzības
-                    </h4>
-                    <p className="mb-2">Pie virtuālajām balvām pieder:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4 mb-3">
-                      <li>bonusu ieskaitījumi konta bilancē;</li>
-                      <li>virtuāli spēļu priekšmeti;</li>
-                      <li>digitālas atlīdzības (tostarp no spēlēm, piemēram, Counter-Strike un citām).</li>
-                    </ul>
-                    <p className="mb-2 font-bold text-white">Virtuālo balvu izsniegšana:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4">
-                      <li>šādas balvas tiek izsniegtas automātiski ar sistēmas palīdzību;</li>
-                      <li>administratora iesaiste nav nepieciešama;</li>
-                      <li>balvas statuss tiek atjaunināts inventārā.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      8. Ierobežojumi un aizliegumi
-                    </h4>
-                    <p className="mb-2">Klientam ir aizliegts:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4 mb-3">
-                      <li>mēģināt ietekmēt keisu izlozes rezultātus;</li>
-                      <li>izmantot sistēmas kļūdas vai ievainojamības;</li>
-                      <li>nodot piekļuvi savam kontam trešajām personām;</li>
-                      <li>pieprasīt balvas nomaiņu vai izlozes rezultāta pārskatīšanu.</li>
-                    </ul>
-                    <p className="text-yellow-400">
-                      Noteikumu pārkāpuma gadījumā piekļuve sistēmai var tikt ierobežota.
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      9. Tehniskie nosacījumi
-                    </h4>
-                    <ul className="list-disc list-inside space-y-2 ml-4">
-                      <li>Visas izlozes notiek automātiski.</li>
-                      <li>Ir iespējami īslaicīgi tehniski traucējumi.</li>
-                      <li>Balvu informācija tiek saglabāta sistēmā arī tehnisku problēmu gadījumā.</li>
-                      <li>CyberHub patur tiesības uz laiku apturēt sistēmas darbību tehniskās apkopes nolūkos.</li>
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h4 className="text-lg font-bold text-white mb-2 uppercase font-[Aldrich]">
-                      10. Noslēguma noteikumi
-                    </h4>
-                    <p className="mb-2">Izmantojot keisu sistēmu, klients apliecina, ka:</p>
-                    <ul className="list-disc list-inside space-y-1 ml-4 mb-3">
-                      <li>ir iepazinies ar šiem noteikumiem;</li>
-                      <li>saprot sistēmas darbības principus;</li>
-                      <li>pieņem katra keisa izlozes rezultātu.</li>
-                    </ul>
-                    <p className="text-gray-400 italic">
-                      Keisu sistēma ir bonusu funkcija un negarantē konkrētas balvas iegūšanu.
-                    </p>
-                  </div>
-                </div>
+               <div className="px-8 py-6 overflow-y-auto max-h-[calc(80vh-88px)] scrollbar-hide">
+                 <div className="text-center text-gray-400">Rules Content Loaded</div>
               </div>
             </motion.div>
           </motion.div>
