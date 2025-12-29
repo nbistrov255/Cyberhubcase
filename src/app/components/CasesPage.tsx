@@ -85,24 +85,31 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
     // Если пользователь не авторизован, можно загрузить публичные кейсы (если бы API позволяло),
     // но пока используем логику профиля. Если профиля нет, кейсы могут быть пустыми или дефолтными.
     if (!profile || !profile.cases) {
+      console.log('⚠️ No profile or no cases in profile');
       setLoading(false);
       return;
     }
 
-    console.log("Loading cases from profile:", profile.cases);
+    // 📦 ОТЛАДКА: Показываем сырые данные с сервера
+    console.log('📦 Raw Cases from Profile:', profile.cases);
 
-    // ИСПРАВЛЕНИЕ: Правильный маппинг с полями threshold, progress, type
+    // УЛУЧШЕННЫЙ МАППИНГ: Нормализация типа для защиты от опечаток
     const mappedCases: CaseData[] = (profile.cases || []).map((apiCase: any) => {
-      // Определяем tier на основе type
+      // Нормализация типа: lowercase + trim для защиты от пробелов и регистра
+      const normalizedType = (apiCase.type || '').toLowerCase().trim();
+      
+      // Определяем tier на основе нормализованного типа (используем contains для гибкости)
       let tier: string;
-      if (apiCase.type === 'daily') {
+      if (normalizedType.includes('daily')) {
         tier = 'Common';
-      } else if (apiCase.type === 'monthly') {
+      } else if (normalizedType.includes('monthly')) {
         tier = 'Premium';
-      } else if (apiCase.type === 'event') {
-        tier = 'Legendary'; // Для event кейсов используем Legendary tier
+      } else if (normalizedType.includes('event')) {
+        tier = 'Legendary';
       } else {
-        tier = 'Common'; // Fallback
+        // Fallback для неизвестных типов - показываем как Common, но логируем
+        console.warn(`⚠️ Unknown case type: "${apiCase.type}" (normalized: "${normalizedType}") for case ID: ${apiCase.id}`);
+        tier = 'Common';
       }
 
       return {
@@ -110,9 +117,9 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
         // Формируем имя с ценой используя поле threshold
         name: apiCase.title 
           ? `${apiCase.title} (${apiCase.threshold}€)` 
-          : (apiCase.type === 'daily' 
+          : (normalizedType.includes('daily')
               ? `Daily Case (${apiCase.threshold}€)` 
-              : apiCase.type === 'monthly'
+              : normalizedType.includes('monthly')
                 ? `Monthly Case (${apiCase.threshold}€)`
                 : `Event Case (${apiCase.threshold}€)`),
         
@@ -127,12 +134,15 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
         // Доступность
         usedToday: apiCase.is_claimed || !apiCase.available,
         
-        // ИСПРАВЛЕНИЕ: isEvent только для type === 'event'
-        isEvent: apiCase.type === 'event',
+        // УЛУЧШЕННАЯ ПРОВЕРКА: isEvent только если тип содержит 'event'
+        isEvent: normalizedType.includes('event'),
       };
     });
 
-    console.log('Mapped cases:', mappedCases); // Добавлен console.log для отладки
+    // 🏷️ ОТЛАДКА: Показываем обработанные данные
+    console.log('🏷️ Mapped Cases:', mappedCases);
+    console.log(`📊 Total cases mapped: ${mappedCases.length}`);
+    
     setCases(mappedCases);
     setLoading(false);
   }, [profile, isAuthenticated]);
@@ -142,6 +152,31 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
   // Разделяем на daily и monthly отдельно
   const dailyCases = cases.filter(c => c.tier === 'Common' && !c.isEvent); // daily
   const monthlyCases = cases.filter(c => c.tier === 'Premium' && !c.isEvent); // monthly
+  
+  // 🔍 DEBUG: Проверка на "осиротевшие" кейсы
+  const totalCategorized = eventCases.length + dailyCases.length + monthlyCases.length;
+  const orphanedCases = cases.filter(c => {
+    const isInEvent = eventCases.includes(c);
+    const isInDaily = dailyCases.includes(c);
+    const isInMonthly = monthlyCases.includes(c);
+    return !isInEvent && !isInDaily && !isInMonthly;
+  });
+  
+  // Логирование в консоль
+  useEffect(() => {
+    if (cases.length > 0) {
+      console.log(`🔍 Categories Breakdown:`);
+      console.log(`   📅 Event Cases: ${eventCases.length}`);
+      console.log(`   📆 Daily Cases: ${dailyCases.length}`);
+      console.log(`   📊 Monthly Cases: ${monthlyCases.length}`);
+      console.log(`   ❓ Orphaned Cases: ${orphanedCases.length}`);
+      
+      if (orphanedCases.length > 0) {
+        console.warn(`⚠️ WARNING: ${orphanedCases.length} cases are not categorized!`);
+        console.warn(`Orphaned cases:`, orphanedCases);
+      }
+    }
+  }, [cases, eventCases, dailyCases, monthlyCases, orphanedCases]);
   
   const [showTermsRules, setShowTermsRules] = useState(false);
   
@@ -673,6 +708,47 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
       {/* FOOTER SECTION - KeyDrop Style */}
       <div className="mt-32 px-12 pb-20">
         <div className="max-w-[1600px] mx-auto">
+          {/* DEBUG SECTION: Orphaned Cases Warning (only if there are orphaned cases) */}
+          {orphanedCases.length > 0 && (
+            <div 
+              className="mb-12 p-6 rounded-lg border"
+              style={{
+                background: 'rgba(239, 68, 68, 0.1)',
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+              }}
+            >
+              <div className="flex items-start gap-4">
+                <div className="flex-shrink-0 text-3xl">⚠️</div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-bold text-red-400 mb-2">
+                    Debug Warning: {orphanedCases.length} Uncategorized Case{orphanedCases.length > 1 ? 's' : ''} Detected
+                  </h3>
+                  <p className="text-sm text-gray-300 mb-3">
+                    The following cases have unknown types and couldn't be categorized into Event, Daily, or Monthly sections:
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {orphanedCases.map((c) => (
+                      <div 
+                        key={c.id} 
+                        className="px-3 py-1.5 rounded text-xs font-mono"
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.2)',
+                          border: '1px solid rgba(239, 68, 68, 0.4)',
+                          color: '#fca5a5',
+                        }}
+                      >
+                        ID: {c.id} | Tier: {c.tier} | Name: {c.name}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-3">
+                    💡 Tip: Check the console (F12) for detailed debugging information about case types.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Stats Container - Centered */}
           <div className="relative">
             {/* Main Container - Flat Clean Panel */}
@@ -758,7 +834,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
                         }}
                       >
                         <svg className="w-5 h-5 transition-colors duration-300 group-hover:text-[#E4405F]" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849.149 3.225-1.664 4.771-4.919 4.919 1.266.058 1.645.07 4.849.07zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
                         </svg>
                       </div>
                       <span className="text-sm uppercase tracking-wide font-[Aldrich]">Instagram</span>
