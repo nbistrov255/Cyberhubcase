@@ -14,6 +14,7 @@ interface CaseData {
   required: number;
   usedToday: boolean;
   isEvent?: boolean;
+  normalizedType?: string; // Добавляем нормализованный тип для надежной фильтрации
 }
 
 const tierColors = {
@@ -136,6 +137,7 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
         
         // УЛУЧШЕННАЯ ПРОВЕРКА: isEvent только если тип содержит 'event'
         isEvent: normalizedType.includes('event'),
+        normalizedType: normalizedType, // Сохраняем нормализованный тип
       };
     });
 
@@ -149,12 +151,20 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
 
   // Разделение кейсов
   const eventCases = cases.filter(c => c.isEvent);
-  // Разделяем на daily и monthly отдельно
-  const dailyCases = cases.filter(c => c.tier === 'Common' && !c.isEvent); // daily
-  const monthlyCases = cases.filter(c => c.tier === 'Premium' && !c.isEvent); // monthly
+  
+  // Daily Cases: содержит 'daily' и НЕ event
+  const dailyCases = cases.filter(c => {
+    const type = (c.normalizedType || '').toLowerCase();
+    return type.includes('daily') && !c.isEvent;
+  });
+  
+  // Monthly Cases: содержит 'monthly' и НЕ event
+  const monthlyCases = cases.filter(c => {
+    const type = (c.normalizedType || '').toLowerCase();
+    return type.includes('monthly') && !c.isEvent;
+  });
   
   // 🔍 DEBUG: Проверка на "осиротевшие" кейсы
-  const totalCategorized = eventCases.length + dailyCases.length + monthlyCases.length;
   const orphanedCases = cases.filter(c => {
     const isInEvent = eventCases.includes(c);
     const isInDaily = dailyCases.includes(c);
