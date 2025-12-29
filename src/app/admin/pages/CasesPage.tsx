@@ -123,8 +123,11 @@ export function CasesPage({ userRole }: CasesPageProps) {
 
   const handleSave = async (formData: CaseFormData) => {
     try {
+      // ИСПРАВЛЕНИЕ 1: Явно используем id из selectedCase или formData
+      const caseId = selectedCase?.id || formData.id;
+      
       const apiPayload = {
-        id: formData.id,
+        id: caseId, // Гарантируем наличие ID для обновлений
         title: formData.nameEn || formData.nameRu || formData.nameLv,
         nameEn: formData.nameEn,
         nameRu: formData.nameRu,
@@ -139,15 +142,15 @@ export function CasesPage({ userRole }: CasesPageProps) {
       console.log('Sending case data:', apiPayload);
 
       let response;
-      if (selectedCase) {
-        // Если есть ID - это обновление (но бэкэнд использует общий POST endpoint для upsert)
-        // Но чтобы сохранить REST структуру, используем POST на общий адрес, так как бэк настроен на upsert по ID
-        response = await fetch('/api/admin/cases', {
-          method: 'POST',
+      if (selectedCase && caseId) {
+        // ИСПРАВЛЕНИЕ: Используем PUT метод для обновления существующего кейса
+        response = await fetch(`/api/admin/cases/${caseId}`, {
+          method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(apiPayload),
         });
       } else {
+        // Создание нового кейса
         response = await fetch('/api/admin/cases', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -180,7 +183,8 @@ export function CasesPage({ userRole }: CasesPageProps) {
         throw new Error('Failed to delete case');
       }
 
-      setCases(cases.filter((c) => c.id !== caseId));
+      // ИСПРАВЛЕНИЕ 2: Правильное удаление одного кейса с приведением типов
+      setCases((prev) => prev.filter((c) => String(c.id) !== String(caseId)));
       toast.success(t('cases.deleteSuccess'));
     } catch (error) {
       console.error('Error deleting case:', error);
