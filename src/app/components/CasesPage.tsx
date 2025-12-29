@@ -119,10 +119,11 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
     setLoading(false);
   }, [profile, isAuthenticated]);
 
-  // Разделить на event и permanent
+  // Разделение кейсов
   const eventCases = cases.filter(c => c.isEvent);
-  // Permanent - это все, что НЕ event (Daily + Monthly)
-  const permanentCases = cases.filter(c => !c.isEvent);
+  // Разделяем на daily и monthly отдельно
+  const dailyCases = cases.filter(c => c.tier === 'Common' && !c.isEvent); // daily
+  const monthlyCases = cases.filter(c => c.tier === 'Premium' && !c.isEvent); // monthly
   
   const [showTermsRules, setShowTermsRules] = useState(false);
   
@@ -604,26 +605,50 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
       {/* PERMANENT CASES SECTION */}
       <div className="px-12 py-8">
         <div className="max-w-7xl mx-auto">
-          {/* Section Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-6"
-          >
-            <h2 className="text-4xl font-bold mb-2 font-[Aldrich]">PERMANENT CASES</h2>
-            <p className="text-gray-400">Available year-round with consistent rewards</p>
-          </motion.div>
+          {/* DAILY CASES SECTION */}
+          {dailyCases.length > 0 && (
+            <div className="mb-16">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6"
+              >
+                <h2 className="text-4xl font-bold mb-2 font-[Aldrich]">DAILY CASES</h2>
+                <p className="text-gray-400">Available every day with consistent rewards</p>
+              </motion.div>
 
-          {/* Unified Block Container */}
-          <div className="p-6">
-            {/* Permanent Cases Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {permanentCases.map((caseData) => renderCaseCard(caseData))}
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {dailyCases.map((caseData) => renderCaseCard(caseData))}
+                </div>
+              </div>
             </div>
-             {permanentCases.length === 0 && !loading && (
-                <div className="text-center py-10 text-gray-500">No cases available</div>
-             )}
-          </div>
+          )}
+
+          {/* MONTHLY CASES SECTION */}
+          {monthlyCases.length > 0 && (
+            <div className="mb-16">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6"
+              >
+                <h2 className="text-4xl font-bold mb-2 font-[Aldrich]">MONTHLY CASES</h2>
+                <p className="text-gray-400">Premium cases available all month long</p>
+              </motion.div>
+
+              <div className="p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                  {monthlyCases.map((caseData) => renderCaseCard(caseData))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* No Cases Message */}
+          {dailyCases.length === 0 && monthlyCases.length === 0 && !loading && (
+            <div className="text-center py-10 text-gray-500">No permanent cases available</div>
+          )}
         </div>
       </div>
 
