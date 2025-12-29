@@ -205,57 +205,53 @@ export function TopBar({
 
           {/* Right Side */}
           <div className="flex items-center gap-3">
-            {/* Wallet Balance - компактная плашка как шестеренка */}
+            {/* Balance Monoblock - Единая плашка со всеми балансами */}
             {isAuthenticated && profile && (
               <div 
-                className="h-10 px-3 rounded-lg bg-white/5 flex items-center gap-2 border border-white/10"
-                title="Wallet Balance"
+                className="h-10 px-4 rounded-lg bg-white/5 flex items-center gap-4 border border-white/10"
+                title="Balance Overview"
               >
-                <DollarSign className="w-4 h-4 text-white" strokeWidth={2.5} />
-                <span className="text-sm font-bold text-white">
-                  {profile.balance?.toFixed(2) || '0.00'} €
-                </span>
-              </div>
-            )}
+                {/* Wallet Balance */}
+                <div className="flex items-center gap-2 pr-3 border-r border-white/10">
+                  <DollarSign className="w-4 h-4 text-[#4ade80]" strokeWidth={2.5} />
+                  <span className="text-sm font-bold text-white">
+                    {profile.balance?.toFixed(2) || '0.00'} €
+                  </span>
+                </div>
 
-            {/* Deposit Progress - компактная плашка */}
-            {isAuthenticated && profile && (
-              <div 
-                className="h-10 px-3 rounded-lg bg-white/5 flex items-center gap-3 border border-white/10"
-                title="Deposit Progress"
-              >
-                <TrendingUp className="w-4 h-4 text-white" strokeWidth={2.5} />
-                <div className="flex items-center gap-2 text-xs">
-                  <div className="flex flex-col items-center">
-                    <span className="text-[9px] text-gray-400 uppercase leading-tight">Today</span>
-                    <span className="text-white font-bold leading-tight">
-                      {(profile.dailySum || 0).toFixed(2)}€
-                    </span>
-                  </div>
-                  <div className="w-px h-6 bg-white/10"></div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-[9px] text-gray-400 uppercase leading-tight">Month</span>
-                    <span className="text-white font-bold leading-tight">
-                      {(profile.monthlySum || 0).toFixed(2)}€
-                    </span>
+                {/* Deposit Progress - Today & Month */}
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="w-4 h-4 text-[#4ade80]" strokeWidth={2.5} />
+                  <div className="flex items-center gap-2 text-xs">
+                    <div className="flex flex-col items-center">
+                      <span className="text-[9px] text-gray-400 uppercase leading-tight">Today</span>
+                      <span className="text-white font-bold leading-tight">
+                        {(profile.dailySum || 0).toFixed(2)}€
+                      </span>
+                    </div>
+                    <div className="w-px h-6 bg-white/10"></div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[9px] text-gray-400 uppercase leading-tight">Month</span>
+                      <span className="text-white font-bold leading-tight">
+                        {(profile.monthlySum || 0).toFixed(2)}€
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {/* Refresh Button - компактная кнопка */}
-            {isAuthenticated && (
-              <button 
-                className="w-10 h-10 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors disabled:opacity-50 border border-white/10"
-                onClick={handleRefreshClick}
-                disabled={isRefreshing}
-                title="Refresh Balance"
-              >
-                <RotateCw 
-                  className={`w-4 h-4 text-white transition-transform duration-1000 ${isRefreshing ? 'animate-spin' : ''}`} 
-                  strokeWidth={2.5} 
-                />
-              </button>
+                {/* Refresh Button - внутри моноблока */}
+                <button 
+                  className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors disabled:opacity-50 ml-2"
+                  onClick={handleRefreshClick}
+                  disabled={isRefreshing}
+                  title="Refresh Balance"
+                >
+                  <RotateCw 
+                    className={`w-4 h-4 text-white transition-transform duration-1000 ${isRefreshing ? 'animate-spin' : ''}`} 
+                    strokeWidth={2.5} 
+                  />
+                </button>
+              </div>
             )}
 
             {/* Settings */}
@@ -268,15 +264,27 @@ export function TopBar({
 
             {/* Login Button or Profile Avatar */}
             {!isAuthenticated ? (
-              // Кнопка авторизации для гостя
+              // Кнопка авторизации - зеленая с градиентом
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={onLoginClick}
-                className="px-4 h-10 rounded-lg bg-gradient-to-r from-[#7c2d3a] to-[#9a3b4a] hover:from-[#9a3b4a] hover:to-[#7c2d3a] flex items-center gap-2 transition-all duration-300 font-bold uppercase text-sm tracking-wider"
+                className="px-5 h-10 rounded-lg flex items-center gap-2 transition-all duration-300 font-bold uppercase text-sm tracking-wider relative overflow-hidden"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(74, 222, 128, 0.15) 0%, rgba(34, 197, 94, 0.25) 100%)',
+                  border: '1px solid rgba(74, 222, 128, 0.3)',
+                  boxShadow: '0 0 20px rgba(74, 222, 128, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
+                }}
               >
-                <User className="w-5 h-5" />
-                <span>Sign In</span>
+                {/* Градиентный блеск на hover */}
+                <motion.div
+                  className="absolute inset-0 opacity-0 hover:opacity-100 transition-opacity duration-300"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(74, 222, 128, 0.2) 0%, rgba(34, 197, 94, 0.3) 100%)',
+                  }}
+                />
+                <User className="w-5 h-5 text-[#4ade80] relative z-10" />
+                <span className="text-[#4ade80] relative z-10">Sign In</span>
               </motion.button>
             ) : (
               // Profile Avatar with Level для авторизованных

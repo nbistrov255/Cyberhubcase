@@ -152,7 +152,7 @@ function ClientAppContent() {
   const handleBalanceRefresh = async () => {
     // Используем метод refresh из AuthContext
     await refreshProfile();
-    toast.success(t('login.loginSuccess') || 'Profile refreshed!');
+    // Убрали toast.success - обновление баланса происходит тихо
   };
 
   // Показываем индикатор загрузки при инициализации
