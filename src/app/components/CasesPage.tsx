@@ -94,25 +94,24 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
     // Преобразовать profile.cases в CaseData[]
     const mappedCases: CaseData[] = (profile.cases || []).map((apiCase: any) => ({
       id: apiCase.id,
-      // Формируем имя с ценой
+      // Формируем имя с ценой используя поле threshold
       name: apiCase.title 
-        ? `${apiCase.title} (${apiCase.threshold_eur || apiCase.threshold}€)` 
+        ? `${apiCase.title} (${apiCase.threshold}€)` 
         : (apiCase.type === 'daily' ? `Daily Case (${apiCase.threshold}€)` : `Monthly Case (${apiCase.threshold}€)`),
       
-      image: apiCase.image_url || apiCase.image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
+      // Используем поле image напрямую
+      image: apiCase.image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
       tier: apiCase.type === 'daily' ? 'Common' : 'Premium',
       
       // Статистика депозитов
       deposited: apiCase.progress || 0,
-      required: apiCase.threshold_eur || apiCase.threshold || 0,
+      required: apiCase.threshold || 0,
       
       // Доступность
       usedToday: apiCase.is_claimed || !apiCase.available,
       
-      // --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
-      // Определяем Event только если тип реально event
-      isEvent: apiCase.type === 'event', 
-      // Monthly и Daily будут считаться НЕ ивентовыми и пойдут в нижнюю сетку
+      // ИСПРАВЛЕНИЕ: Определяем Event только если тип реально event
+      isEvent: apiCase.type === 'event',
     }));
 
     setCases(mappedCases);
