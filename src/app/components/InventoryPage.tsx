@@ -116,14 +116,21 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
            // Обновляем инвентарь (убираем полученный предмет)
            setItems(prev => prev.filter(i => i.inventory_id !== itemId));
            // Обновляем баланс в шапке через AuthContext
-           await refreshProfile();
+           try {
+             await refreshProfile();
+             console.log('✅ Profile refreshed successfully');
+           } catch (refreshError) {
+             console.error('⚠️ Failed to refresh profile:', refreshError);
+             // Не критично - предмет уже получен
+           }
         } else {
            toast.success('Request sent to Admin!');
            setItems(prev => prev.map(i => i.inventory_id === itemId ? { ...i, status: 'processing' } : i));
         }
       }
     } catch (error) {
-      toast.error('Failed to claim');
+      console.error('❌ Claim error:', error);
+      toast.error(`Failed to claim: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setProcessingId(null);
     }

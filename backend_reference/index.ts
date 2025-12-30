@@ -153,9 +153,50 @@ async function requireSession(req: express.Request, res: express.Response, next:
   next();
 }
 
-async function addClientDeposit(userUuid: string, amount: number) {
-    console.log(`💰 [MOCK] Adding ${amount} to ${userUuid}`);
-    return true; 
+// 🔥 ФУНКЦИЯ ПОПОЛНЕНИЯ через SmartShell setDeposit
+async function addClientDeposit(userUuid: string, amount: number): Promise<boolean> {
+    console.log(`💰 [SmartShell] Adding ${amount}€ to ${userUuid}`);
+    try {
+        const token = await getServiceToken();
+        
+        // 1. Получаем текущий баланс клиента
+        const clientData = await gqlRequest<{ clients: { data: { uuid: string, deposit: number }[] } }>(`
+            query GetClients { clients(page: 1, first: 5000) { data { uuid deposit } } }
+        `, {}, token);
+        
+        const client = clientData.clients?.data?.find(c => c.uuid === userUuid);
+        if (!client) {
+            console.error(`❌ Client not found: ${userUuid}`);
+            return false;
+        }
+        
+        const currentBalance = client.deposit || 0;
+        const newBalance = currentBalance + amount;
+        
+        console.log(`📊 Current: ${currentBalance}€, Adding: ${amount}€, New: ${newBalance}€`);
+        
+        // 2. Устанавливаем новый баланс через setDeposit
+        // ВАЖНО: setDeposit ПЕРЕЗАПИСЫВАЕТ баланс (не добавляет), поэтому передаём итоговое значение
+        await gqlRequest(`
+            mutation SetDeposit($input: SetDepositInput!) {
+                setDeposit(input: $input) {
+                    id
+                    deposit
+                }
+            }
+        `, {
+            input: {
+                client_uuid: userUuid,
+                value: newBalance
+            }
+        }, token);
+        
+        console.log(`✅ Balance updated: ${newBalance}€`);
+        return true;
+    } catch (error: any) {
+        console.error(`❌ Failed to add balance: ${error.message}`);
+        return false;
+    }
 }
 
 // === ROUTES ===
