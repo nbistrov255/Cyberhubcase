@@ -228,6 +228,7 @@ function ClientAppContent() {
             onBack={() => setCurrentPage('cases')}
             onClose={() => setCurrentPage('cases')}
             onWin={handleCaseWin}
+            onRefreshProfile={refreshProfile}
             onRequestLogin={() => {
               setLoginModalOpen(true);
               toast.warning(t('login.needAuth').replace('{action}', t('login.actionOpen')));

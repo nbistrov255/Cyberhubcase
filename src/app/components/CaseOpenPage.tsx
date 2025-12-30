@@ -26,6 +26,7 @@ interface CaseOpenPageProps {
   onClose: () => void;
   onWin: (item: CaseItem) => void;
   onRequestLogin: () => void;
+  onRefreshProfile: () => void; // ✅ Новая функция для обновления баланса без перезагрузки
 }
 
 const rarityColors = {
@@ -151,7 +152,7 @@ function CaseItemCard({ item }: { item: CaseItem }) {
   );
 }
 
-export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required, isAuthenticated, onBack, onClose, onWin, onRequestLogin }: CaseOpenPageProps) {
+export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required, isAuthenticated, onBack, onClose, onWin, onRequestLogin, onRefreshProfile }: CaseOpenPageProps) {
   const [isMuted, setIsMuted] = useState(false);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rouletteItems, setRouletteItems] = useState<CaseItem[]>([]);
@@ -261,15 +262,17 @@ export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required,
       }
 
       console.log('🎰 Case opened, result:', data);
+      console.log('🎰 WIN DATA:', data); // <-- ЛОГ ДЛЯ ОТЛАДКИ
       
       // Map the winning item from API
       const winningItem: CaseItem = {
         id: data.item?.id || String(Date.now()),
+        // Исправлено: проверяем все возможные поля
         name: data.item?.name || data.item?.title || 'Unknown Item',
         type: data.item?.type || 'Item',
         image: data.item?.image || data.item?.image_url || 'https://i.ibb.co/bRChPPVb/boxcard.png',
         rarity: mapRarity(data.item?.rarity || 'Common'),
-        chance: 0, // Не важно для выигрыша
+        chance: 0,
       };
       
       // Calculate final position (center on winning item)
@@ -296,9 +299,8 @@ export function CaseOpenPage({ caseId, caseName, caseImage, deposited, required,
       // Show win after animation
       setTimeout(() => {
         setIsSpinning(false);
-        onWin(winningItem);
-        // Обновляем баланс после прокрутки (перезагрузка страницы через 1с)
-        setTimeout(() => window.location.reload(), 1000);
+        onWin(winningItem); // Показываем попап с выигрышем
+        onRefreshProfile(); // ✅ Обновляем баланс БЕЗ перезагрузки
       }, 5000);
     } catch (error: any) {
       console.error('❌ Error opening case:', error);
