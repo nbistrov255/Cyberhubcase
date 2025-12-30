@@ -4,6 +4,26 @@
 
 ---
 
+## [2024-12-30] - CRITICAL FIX: Timeout 90 сек + детальное логирование
+
+### Changed:
+- **Timeout увеличен**: 60 сек → **90 секунд** (запрос `clients(first: 10000)` требует больше времени)
+- **Детальные логи** в `addClientDeposit()`:
+  ```
+  🔑 Service token obtained
+  📡 Step 1/2: Fetching current BONUS balance...
+  ✅ Step 1/2: Received 2543 clients
+  📊 Current BONUS: 100€, Adding: 5€, New: 105€
+  📡 Step 2/2: Setting new BONUS balance...
+  ✅ BONUS updated: 105€ (added 5€)
+  ```
+
+### Why:
+SmartShell API медленный при запросе большого количества клиентов (`first: 10000`).  
+60 секунд timeout был недостаточен → "This operation was aborted".
+
+---
+
 ## [2024-12-30] - ФИНАЛ: setBonus API + увеличен timeout до 60 сек
 
 ### Changed:

@@ -58,7 +58,7 @@ async function gqlRequest<T>(query: string, variables: any = {}, token?: string)
   
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // ⚡ 60 секунд для SmartShell
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // ⚡ 90 секунд для тяжёлых запросов
 
     const res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ query, variables }), signal: controller.signal });
     clearTimeout(timeoutId);
@@ -158,11 +158,18 @@ async function addClientDeposit(userUuid: string, amount: number): Promise<boole
     console.log(`💰 [SmartShell] Adding ${amount}€ BONUS to ${userUuid}`);
     try {
         const token = await getServiceToken();
+        console.log(`🔑 Service token obtained`);
         
-        // 1. Получаем текущий БОНУСНЫЙ баланс клиента
+        // 1. Получаем текущий БОНУСНЫЙ баланс клиента (оптимизировано: только нужные поля)
+        console.log(`📡 Step 1/2: Fetching current BONUS balance...`);
         const clientData = await gqlRequest<{ clients: { data: { uuid: string, bonus: number }[] } }>(`
-            query GetClients { clients(page: 1, first: 5000) { data { uuid bonus } } }
+            query GetClients { 
+                clients(page: 1, first: 10000) { 
+                    data { uuid bonus } 
+                } 
+            }
         `, {}, token);
+        console.log(`✅ Step 1/2: Received ${clientData.clients?.data?.length || 0} clients`);
         
         const client = clientData.clients?.data?.find(c => c.uuid === userUuid);
         if (!client) {
@@ -176,6 +183,7 @@ async function addClientDeposit(userUuid: string, amount: number): Promise<boole
         console.log(`📊 Current BONUS: ${currentBonus}€, Adding: ${amount}€, New: ${newBonus}€`);
         
         // 2. Устанавливаем новый БОНУСНЫЙ баланс через setBonus
+        console.log(`📡 Step 2/2: Setting new BONUS balance...`);
         await gqlRequest<{ setBonus: { uuid: string; login: string } }>(`
             mutation SetBonus($input: SetBonusInput!) {
                 setBonus(input: $input) {
