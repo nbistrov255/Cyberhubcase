@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight, Info, Trash2, Check } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useAuth } from '../contexts/AuthContext';
 import { API_ENDPOINTS, getAuthHeaders } from '../../config/api';
@@ -223,21 +223,71 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     }
   };
 
-  const handleClaimItem = (itemId: string) => {
+  const handleClaimItem = async (itemId: string, itemType?: string) => {
     const item = inventory.find(i => i.id === itemId);
     if (!item) return;
 
-    const newRequest: ClaimRequest = {
-      id: itemId,
-      requestId: generateRequestId(),
-      itemName: item.title || item.name,
-      itemRarity: (item.rarity || 'common') as keyof typeof rarityColors,
-      timestamp: new Date(),
-      status: 'pending',
-      timeRemaining: 3600, // 1 hour in seconds
-    };
+    try {
+      const response = await fetch(API_ENDPOINTS.claimItem, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ inventory_id: itemId }),
+      });
+      const result = await response.json();
 
-    setClaimRequests(prev => [...prev, newRequest]);
+      if (!response.ok) {
+        if (result.error === 'TRADE_LINK_MISSING') {
+          toast.error('Please set your Trade Link first!');
+          return;
+        }
+        throw new Error(result.error);
+      }
+
+      if (result.success) {
+        const type = itemType || item.type;
+        if (type === 'money' || type?.includes('money')) {
+          toast.success(result.message || 'Balance added!');
+          setInventory(prev => prev.filter(i => i.id !== itemId));
+          setTimeout(() => window.location.reload(), 1000);
+        } else {
+          toast.success('Request sent to Admin!');
+          const newRequest: ClaimRequest = {
+            id: itemId,
+            requestId: generateRequestId(),
+            itemName: item.title || item.name,
+            itemRarity: (item.rarity || 'common') as keyof typeof rarityColors,
+            timestamp: new Date(),
+            status: 'pending',
+            timeRemaining: 3600,
+          };
+          setClaimRequests(prev => [...prev, newRequest]);
+        }
+      }
+    } catch (error) {
+      toast.error('Failed to claim item');
+    }
+  };
+
+  const handleSellItem = async (itemId: string, sellPrice: number) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.sellItem, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ inventory_id: itemId }),
+      });
+
+      if (!response.ok) throw new Error('Failed to sell');
+
+      const result = await response.json();
+      if (result.success) {
+        setInventory(prev => prev.filter(i => i.id !== itemId));
+        toast.success(`Item sold for ${sellPrice}€`);
+      } else {
+        toast.error('Failed to sell item');
+      }
+    } catch (error) {
+      toast.error('Failed to sell item');
+    }
   };
 
   const handleRemoveRequest = (itemId: string) => {
@@ -591,6 +641,9 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                     const skinName = nameParts[1] || itemName;
                     const itemRarity = (item.rarity || 'common') as keyof typeof rarityColors;
                     const itemImage = item.image_url || item.image || 'https://via.placeholder.com/200';
+                    const itemType = item.type || '';
+                    const isMoney = itemType === 'money' || itemType.includes('money');
+                    const sellPrice = item.sell_price_eur || 0;
                     
                     return (
                       <motion.div
@@ -610,6 +663,17 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                           overflow: 'hidden',
                         }}
                       >
+                        {/* Info Icon - Always Visible */}
+                        <div 
+                          className="absolute top-2 left-2 z-20 bg-black/60 rounded-full p-1.5"
+                          title="Вы можете получить данный товар или продать его, и баланс продажи зачислится на ваш личный аккаунт"
+                        >
+                          <Info 
+                            className="w-3.5 h-3.5" 
+                            style={{ color: '#ffffff' }} 
+                          />
+                        </div>
+
                         {/* Full Card Color Overlay */}
                         <div 
                           className="absolute inset-0 pointer-events-none"
@@ -714,51 +778,103 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                                 animate={{ opacity: 1 }}
                                 exit={{ opacity: 0 }}
                                 transition={{ duration: 0.2 }}
-                                className="text-center"
+                                className="text-center space-y-1"
                               >
-                                {/* Weapon Name - Small */}
-                                <p className="text-[11px] text-white/60 mb-0.5 truncate">
-                                  {weaponName}
+                                {/* Item Type */}
+                                <p className="text-xs text-white/60 truncate">
+                                  {itemType.toUpperCase()}
                                 </p>
 
-                                {/* Skin Name - Bold */}
+                                {/* Item Name */}
                                 <p className="font-bold text-sm text-white truncate">
                                   {skinName}
                                 </p>
+
+                                {/* Sell Price - только для НЕ money */}
+                                {!isMoney && (
+                                  <p className="text-xs font-bold" style={{ color: '#ef4444' }}>
+                                    Sell: {sellPrice}€
+                                  </p>
+                                )}
                               </motion.div>
                             )}
                           </AnimatePresence>
 
                         </div>
 
-                        {/* Claim Button - Shows on Hover */}
+                        {/* Action Buttons - Show on Hover */}
                         <AnimatePresence>
                           {isHovered && !hasClaimRequest && (
                             <motion.div
-                              initial={{ opacity: 0, y: 10 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              exit={{ opacity: 0, y: 10 }}
-                              className="absolute bottom-3 left-3 right-3 z-50 pointer-events-none"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              className="absolute inset-0 flex items-center justify-center gap-2 p-3 z-50"
+                              style={{
+                                background: 'rgba(0, 0, 0, 0.85)',
+                                backdropFilter: 'blur(8px)',
+                              }}
                             >
-                              <motion.button
-                                whileHover={{ y: -2 }}
-                                whileTap={{ scale: 0.95 }}
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleClaimItem(item.id);
-                                }}
-                                className="w-full py-2.5 rounded-lg text-xs font-bold font-[Aldrich] uppercase transition-all pointer-events-auto shadow-lg"
-                                style={{
-                                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
-                                  backdropFilter: 'blur(10px)',
-                                  WebkitBackdropFilter: 'blur(10px)',
-                                  border: '1px solid rgba(16, 185, 129, 0.6)',
-                                  color: '#10b981',
-                                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
-                                }}
-                              >
-                                ЗАБРАТЬ
-                              </motion.button>
+                              {!isMoney ? (
+                                <>
+                                  {/* Green ПОЛУЧИТЬ Button */}
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleClaimItem(item.id, itemType);
+                                    }}
+                                    className="flex-1 py-2.5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5"
+                                    style={{
+                                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                      color: '#ffffff',
+                                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    }}
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                    ПОЛУЧИТЬ
+                                  </motion.button>
+
+                                  {/* Red SELL Button */}
+                                  <motion.button
+                                    whileHover={{ scale: 1.05 }}
+                                    whileTap={{ scale: 0.95 }}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleSellItem(item.id, sellPrice);
+                                    }}
+                                    className="flex-1 py-2.5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5"
+                                    style={{
+                                      background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
+                                      color: '#ffffff',
+                                      border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    }}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    SELL {sellPrice}€
+                                  </motion.button>
+                                </>
+                              ) : (
+                                /* Money Type - Single Button */
+                                <motion.button
+                                  whileHover={{ scale: 1.05 }}
+                                  whileTap={{ scale: 0.95 }}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleClaimItem(item.id, itemType);
+                                  }}
+                                  className="w-full py-2.5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5"
+                                  style={{
+                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                                    color: '#ffffff',
+                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                  }}
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  ПОЛУЧИТЬ
+                                </motion.button>
+                              )}
                             </motion.div>
                           )}
                         </AnimatePresence>
