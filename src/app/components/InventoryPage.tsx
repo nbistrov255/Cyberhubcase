@@ -234,15 +234,15 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                 >
                   {/* Image */}
                   <div className="relative aspect-square overflow-hidden">
-                    {/* ✅ Информационная иконка в левом верхнем углу */}
+                    {/* 🔴 DEBUG: Информационная иконка должна быть видна ВСЕГДА (НЕ только при hover) */}
                     <div 
-                      className="absolute top-3 left-3 z-10"
+                      className="absolute top-3 left-3 z-20 bg-black/50 rounded-full p-1"
                       title="Вы можете получить данный товар или продать его, и баланс продажи зачислится на ваш личный аккаунт"
                     >
                       <Info 
-                        className="w-5 h-5 transition-opacity hover:opacity-100" 
+                        className="w-5 h-5" 
                         style={{ 
-                          color: 'rgba(255, 255, 255, 0.6)',
+                          color: '#ffffff',
                         }} 
                       />
                     </div>
@@ -253,7 +253,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
 
-                    {/* Hover Overlay with Action Buttons */}
+                    {/* 🔴 DEBUG: Hover Overlay - проверьте console.log при наведении */}
                     <AnimatePresence>
                       {hoveredItem === item.inventory_id && item.status !== 'processing' && (
                         <motion.div
@@ -265,16 +265,20 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                             background: 'rgba(0, 0, 0, 0.8)',
                             backdropFilter: 'blur(4px)',
                           }}
+                          onAnimationComplete={() => console.log('🔴 DEBUG: Hover overlay shown for item type:', item.type)}
                         >
-                          {/* ✅ Для типов skin и physical - ДВЕ кнопки в ряд */}
+                          {/* 🔴 DEBUG: Проверьте тип предмета - {item.type} */}
                           {item.type !== 'money' ? (
                             <>
-                              {/* Зеленая кнопка ПОЛУЧИТЬ слева */}
+                              {/* 🔴 Зеленая кнопка ПОЛУЧИТЬ слева */}
                               <motion.button
                                 initial={{ scale: 0.9 }}
                                 animate={{ scale: 1 }}
                                 exit={{ scale: 0.9 }}
-                                onClick={() => handleClaimItem(item.inventory_id, item.type)}
+                                onClick={() => {
+                                  console.log('🔴 DEBUG: ПОЛУЧИТЬ clicked for type:', item.type);
+                                  handleClaimItem(item.inventory_id, item.type);
+                                }}
                                 className="flex-1 px-4 py-3 rounded-lg font-bold uppercase transition-all text-sm"
                                 style={{
                                   background: '#10b981',
@@ -287,12 +291,15 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                                 ПОЛУЧИТЬ
                               </motion.button>
 
-                              {/* Красная кнопка SELL справа с иконкой корзины */}
+                              {/* 🔴 Красная кнопка SELL справа с иконкой корзины */}
                               <motion.button
                                 initial={{ scale: 0.9 }}
                                 animate={{ scale: 1 }}
                                 exit={{ scale: 0.9 }}
-                                onClick={() => handleSellItem(item.inventory_id, item.sell_price_eur, item.title)}
+                                onClick={() => {
+                                  console.log('🔴 DEBUG: SELL clicked, price:', item.sell_price_eur);
+                                  handleSellItem(item.inventory_id, item.sell_price_eur, item.title);
+                                }}
                                 className="flex-1 px-4 py-3 rounded-lg font-bold uppercase transition-all flex items-center justify-center gap-2 text-sm"
                                 style={{
                                   background: '#7c2d3a',
@@ -307,12 +314,15 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                               </motion.button>
                             </>
                           ) : (
-                            /* ✅ Для типа money - ОДНА зеленая кнопка на всю ширину */
+                            /* 🔴 DEBUG: MONEY TYPE - только одна кнопка */
                             <motion.button
                               initial={{ scale: 0.9 }}
                               animate={{ scale: 1 }}
                               exit={{ scale: 0.9 }}
-                              onClick={() => handleClaimItem(item.inventory_id, item.type)}
+                              onClick={() => {
+                                console.log('🔴 DEBUG: ПОЛУЧИТЬ clicked for MONEY type');
+                                handleClaimItem(item.inventory_id, item.type);
+                              }}
                               className="w-full px-6 py-3 rounded-lg font-bold uppercase transition-all"
                               style={{
                                 background: '#10b981',
