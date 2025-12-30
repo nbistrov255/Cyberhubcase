@@ -173,7 +173,7 @@ async function addClientDeposit(userUuid: string, amount: number): Promise<boole
         console.log(`✅ Found client_id: ${client.id} for UUID: ${userUuid}`);
         
         // 2. Создаём платёж с типом BONUS (согласно документации SmartShell)
-        const paymentResult = await gqlRequest(`
+        const paymentResult = await gqlRequest<{ createPayment: { id: string; sum: number } }>(`
             mutation CreatePayment($input: CreatePaymentInput!) {
                 createPayment(input: $input) {
                     id
@@ -463,7 +463,7 @@ app.post("/api/inventory/claim", requireSession, async (req, res) => {
             
             // ⚡ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Сначала помечаем как 'processing'
             await db.run("UPDATE inventory SET status = 'processing', updated_at = ? WHERE id = ?", Date.now(), inventory_id);
-            console.log("🔒 Item locked (status = 'processing')\");
+            console.log("🔒 Item locked (status = 'processing')");
             
             // Пытаемся пополнить баланс
             const success = await addClientDeposit(user_uuid, amount);
