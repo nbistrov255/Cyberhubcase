@@ -4,41 +4,52 @@
 
 ---
 
-## [2024-12-30] - Реализована интеграция пополнения баланса через SmartShell setDeposit API
+## [2024-12-30] - ФИНАЛЬНОЕ ИСПРАВЛЕНИЕ: createPayment с BONUS + защита от дублей
 
 ### Changed:
-- **Backend**: Функция `addClientDeposit()` теперь РЕАЛЬНО пополняет баланс через SmartShell API
-- Используется метод **setDeposit** (согласно мануалу SmartShell) с Read-Modify-Write паттерном
-- **Алгоритм (безопасный):**
-  1. Получаем текущий `deposit` клиента через GraphQL query
-  2. Вычисляем новый баланс: `currentBalance + amount`
-  3. Устанавливаем новый баланс через `setDeposit` mutation (ВАЖНО: setDeposit ПЕРЕЗАПИСЫВАЕТ, а не добавляет!)
-
-**Было:**
-```typescript
-async function addClientDeposit(userUuid: string, amount: number) {
-    console.log(`💰 [MOCK] Adding ${amount} to ${userUuid}`);
-    return true; 
-}
-```
-
-**Стало:**
-```typescript
-async function addClientDeposit(userUuid: string, amount: number): Promise<boolean> {
-    // 1. Read текущий баланс
-    // 2. Modify (добавляем сумму)
-    // 3. Write через setDeposit(newBalance)
-    return true;
-}
-```
+- **Backend**: Функция `addClientDeposit()` переписана на использование `createPayment` с типом "BONUS"
+- Используется `client_id` (числовой) вместо UUID для SmartShell API
+- **Timeout увеличен**: 15 сек → 30 сек (исправляет "This operation was aborted")
 
 ### Fixed:
-- Теперь при claim денег баланс РЕАЛЬНО зачисляется на SmartShell депозит
-- Используется официальная GraphQL мутация `setDeposit` согласно SmartShell API documentation
-- Реализован безопасный Read-Modify-Write паттерн для предотвращения race conditions
+- ✅ **РЕАЛЬНОЕ пополнение БОНУСОВ** через SmartShell GraphQL `createPayment` mutation
+- ✅ **Защита от дублирования**: Item блокируется (`status='processing'`) ДО вызова API
+- ✅ **Откат при ошибке**: Если `addClientDeposit()` fails → item возвращается в status='available'
+- ✅ **Frontend логирование**: Добавлены console.log для отладки
+
+**Новый алгоритм:**
+```typescript
+1. Проверка: item.status === 'available'
+2. LOCK: UPDATE status = 'processing' (защита от double-click)
+3. API: createPayment с type="BONUS", client_id, amount
+4a. Успех → UPDATE status = 'received'
+4b. Fail → UPDATE status = 'available' (откат)
+```
+
+**Пример createPayment:**
+```graphql
+mutation CreatePayment($input: CreatePaymentInput!) {
+  createPayment(input: $input) {
+    id sum
+  }
+}
+variables: {
+  input: {
+    client_id: 12345,  # Числовой ID клиента
+    sum: 5,
+    cash_sum: 0,
+    card_sum: 0,
+    items: [{
+      type: "BONUS",  # ⚡ Зачисление на бонусный счёт
+      amount: 1,
+      sum: 5
+    }]
+  }
+}
+```
 
 ### Security Note:
-Согласно мануалу SmartShell: *"setDeposit value может перезаписывать баланс. Следовательно, бэкенд ДОЛЖЕН сначала прочитать текущий deposit, добавить сумму бонуса и отправить итоговое значение"*
+Согласно мануалу SmartShell: *"items с типом 'BONUS' говорит системе: Зачисли эти деньги не на основной депозит (DEPOSIT), а на бонусный счет"*
 
 ---
 

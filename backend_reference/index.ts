@@ -58,7 +58,7 @@ async function gqlRequest<T>(query: string, variables: any = {}, token?: string)
   
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 сек
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // ⚡ Увеличено до 30 сек
 
     const res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ query, variables }), signal: controller.signal });
     clearTimeout(timeoutId);
@@ -153,15 +153,15 @@ async function requireSession(req: express.Request, res: express.Response, next:
   next();
 }
 
-// 🔥 ФУНКЦИЯ ПОПОЛНЕНИЯ через SmartShell setDeposit
+// 🔥 ФУНКЦИЯ ПОПОЛНЕНИЯ БОНУСОВ через SmartShell createPayment
 async function addClientDeposit(userUuid: string, amount: number): Promise<boolean> {
-    console.log(`💰 [SmartShell] Adding ${amount}€ to ${userUuid}`);
+    console.log(`💰 [SmartShell] Adding ${amount}€ BONUS to ${userUuid}`);
     try {
         const token = await getServiceToken();
         
-        // 1. Получаем текущий баланс клиента
-        const clientData = await gqlRequest<{ clients: { data: { uuid: string, deposit: number }[] } }>(`
-            query GetClients { clients(page: 1, first: 5000) { data { uuid deposit } } }
+        // 1. Получаем client_id (числовой ID, не UUID!)
+        const clientData = await gqlRequest<{ clients: { data: { uuid: string, id: number }[] } }>(`
+            query GetClients { clients(page: 1, first: 5000) { data { uuid id } } }
         `, {}, token);
         
         const client = clientData.clients?.data?.find(c => c.uuid === userUuid);
@@ -170,31 +170,37 @@ async function addClientDeposit(userUuid: string, amount: number): Promise<boole
             return false;
         }
         
-        const currentBalance = client.deposit || 0;
-        const newBalance = currentBalance + amount;
+        console.log(`✅ Found client_id: ${client.id} for UUID: ${userUuid}`);
         
-        console.log(`📊 Current: ${currentBalance}€, Adding: ${amount}€, New: ${newBalance}€`);
-        
-        // 2. Устанавливаем новый баланс через setDeposit
-        // ВАЖНО: setDeposit ПЕРЕЗАПИСЫВАЕТ баланс (не добавляет), поэтому передаём итоговое значение
-        await gqlRequest(`
-            mutation SetDeposit($input: SetDepositInput!) {
-                setDeposit(input: $input) {
+        // 2. Создаём платёж с типом BONUS (согласно документации SmartShell)
+        const paymentResult = await gqlRequest(`
+            mutation CreatePayment($input: CreatePaymentInput!) {
+                createPayment(input: $input) {
                     id
-                    deposit
+                    sum
                 }
             }
         `, {
             input: {
-                client_uuid: userUuid,
-                value: newBalance
+                client_id: client.id,
+                sum: amount,
+                cash_sum: 0,  // Административное начисление (не кассовая операция)
+                card_sum: 0,
+                items: [
+                    {
+                        type: "BONUS",  // ⚡ КЛЮЧЕВОЙ ПАРАМЕТР - зачисляем на БОНУСНЫЙ счёт
+                        amount: 1,
+                        sum: amount
+                    }
+                ]
             }
         }, token);
         
-        console.log(`✅ Balance updated: ${newBalance}€`);
+        console.log(`✅ BONUS payment created: ${paymentResult.createPayment.id}, amount: ${amount}€`);
         return true;
     } catch (error: any) {
-        console.error(`❌ Failed to add balance: ${error.message}`);
+        console.error(`❌ Failed to add BONUS: ${error.message}`);
+        console.error(`Full error:`, error);
         return false;
     }
 }
@@ -454,7 +460,22 @@ app.post("/api/inventory/claim", requireSession, async (req, res) => {
         if (item.type === 'money') {
             console.log("💰 Auto-claiming money...");
             const amount = item.amount_eur || item.price_eur || 0;
-            await addClientDeposit(user_uuid, amount);
+            
+            // ⚡ ЗАЩИТА ОТ ДУБЛИРОВАНИЯ: Сначала помечаем как 'processing'
+            await db.run("UPDATE inventory SET status = 'processing', updated_at = ? WHERE id = ?", Date.now(), inventory_id);
+            console.log("🔒 Item locked (status = 'processing')\");
+            
+            // Пытаемся пополнить баланс
+            const success = await addClientDeposit(user_uuid, amount);
+            
+            if (!success) {
+                // Откатываем статус обратно если не удалось
+                await db.run("UPDATE inventory SET status = 'available', updated_at = ? WHERE id = ?", Date.now(), inventory_id);
+                console.error("❌ Failed to add balance, item restored");
+                return res.status(500).json({ error: "Failed to add balance" });
+            }
+            
+            // Только после успешного пополнения помечаем как 'received'
             await db.run("UPDATE inventory SET status = 'received', updated_at = ? WHERE id = ?", Date.now(), inventory_id);
             console.log("✅ Money added");
             return res.json({ success: true, type: 'money', message: `Added ${amount}€ to balance` });
