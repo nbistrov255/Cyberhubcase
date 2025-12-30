@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Search, Loader2 } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, Info, Trash2 } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -234,6 +234,19 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                 >
                   {/* Image */}
                   <div className="relative aspect-square overflow-hidden">
+                    {/* ✅ Информационная иконка в левом верхнем углу */}
+                    <div 
+                      className="absolute top-3 left-3 z-10"
+                      title="Вы можете получить данный товар или продать его, и баланс продажи зачислится на ваш личный аккаунт"
+                    >
+                      <Info 
+                        className="w-5 h-5 transition-opacity hover:opacity-100" 
+                        style={{ 
+                          color: 'rgba(255, 255, 255, 0.6)',
+                        }} 
+                      />
+                    </div>
+
                     <img
                       src={item.image_url}
                       alt={item.title}
@@ -247,49 +260,71 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="absolute inset-0 flex items-center justify-center gap-3"
+                          className="absolute inset-0 flex items-center justify-center gap-3 p-4"
                           style={{
                             background: 'rgba(0, 0, 0, 0.8)',
                             backdropFilter: 'blur(4px)',
                           }}
                         >
-                          {/* ✅ КНОПКА SELL - скрыта для type === 'money' */}
-                          {item.type !== 'money' && (
+                          {/* ✅ Для типов skin и physical - ДВЕ кнопки в ряд */}
+                          {item.type !== 'money' ? (
+                            <>
+                              {/* Зеленая кнопка ПОЛУЧИТЬ слева */}
+                              <motion.button
+                                initial={{ scale: 0.9 }}
+                                animate={{ scale: 1 }}
+                                exit={{ scale: 0.9 }}
+                                onClick={() => handleClaimItem(item.inventory_id, item.type)}
+                                className="flex-1 px-4 py-3 rounded-lg font-bold uppercase transition-all text-sm"
+                                style={{
+                                  background: '#10b981',
+                                  color: '#ffffff',
+                                  border: '2px solid #059669',
+                                }}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                ПОЛУЧИТЬ
+                              </motion.button>
+
+                              {/* Красная кнопка SELL справа с иконкой корзины */}
+                              <motion.button
+                                initial={{ scale: 0.9 }}
+                                animate={{ scale: 1 }}
+                                exit={{ scale: 0.9 }}
+                                onClick={() => handleSellItem(item.inventory_id, item.sell_price_eur, item.title)}
+                                className="flex-1 px-4 py-3 rounded-lg font-bold uppercase transition-all flex items-center justify-center gap-2 text-sm"
+                                style={{
+                                  background: '#7c2d3a',
+                                  color: '#ffffff',
+                                  border: '2px solid #9a3b4a',
+                                }}
+                                whileHover={{ scale: 1.05 }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                                SELL {item.sell_price_eur}€
+                              </motion.button>
+                            </>
+                          ) : (
+                            /* ✅ Для типа money - ОДНА зеленая кнопка на всю ширину */
                             <motion.button
                               initial={{ scale: 0.9 }}
                               animate={{ scale: 1 }}
                               exit={{ scale: 0.9 }}
-                              onClick={() => handleSellItem(item.inventory_id, item.sell_price_eur, item.title)}
-                              className="px-6 py-3 rounded-lg font-bold uppercase transition-all"
+                              onClick={() => handleClaimItem(item.inventory_id, item.type)}
+                              className="w-full px-6 py-3 rounded-lg font-bold uppercase transition-all"
                               style={{
-                                background: '#7c2d3a',
+                                background: '#10b981',
                                 color: '#ffffff',
-                                border: '2px solid #9a3b4a',
+                                border: '2px solid #059669',
                               }}
                               whileHover={{ scale: 1.05 }}
                               whileTap={{ scale: 0.95 }}
                             >
-                              SELL {item.sell_price_eur}€
+                              ПОЛУЧИТЬ
                             </motion.button>
                           )}
-
-                          {/* ✅ КНОПКА CLAIM - видна для ВСЕХ типов */}
-                          <motion.button
-                            initial={{ scale: 0.9 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0.9 }}
-                            onClick={() => handleClaimItem(item.inventory_id, item.type)}
-                            className="px-6 py-3 rounded-lg font-bold uppercase transition-all"
-                            style={{
-                              background: '#10b981',
-                              color: '#ffffff',
-                              border: '2px solid #059669',
-                            }}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                          >
-                            CLAIM
-                          </motion.button>
                         </motion.div>
                       )}
                     </AnimatePresence>
