@@ -5,6 +5,8 @@ import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
 import { CaseFormModal, CaseFormData } from '../components/CaseFormModal';
 import { toast } from 'sonner';
+// ✅ ДОБАВЛЕН ИМПОРТ ЗАГОЛОВКОВ АВТОРИЗАЦИИ
+import { getAuthHeaders } from '../../../config/api';
 
 interface Case {
   id: string;
@@ -41,7 +43,10 @@ export function CasesPage({ userRole }: CasesPageProps) {
   const fetchCases = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/admin/cases');
+      // ✅ ИСПРАВЛЕНО: Добавлены заголовки с токеном!
+      const response = await fetch('/api/admin/cases', {
+        headers: getAuthHeaders(),
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch cases');
@@ -55,14 +60,23 @@ export function CasesPage({ userRole }: CasesPageProps) {
           ...caseItem,
           // Маппинг полей от бэкенда к фронтенду
           id: caseItem.id,
-          nameEn: caseItem.nameEn || caseItem.title,
-          nameRu: caseItem.nameRu || caseItem.title,
-          nameLv: caseItem.nameLv || caseItem.title,
-          // Бэкенд теперь возвращает threshold и image, но на всякий случай проверяем и старые поля
+          // ✅ Бэкенд отдает 'title', мы кладем его в nameEn/Ru/Lv
+          nameEn: caseItem.title || caseItem.nameEn || 'Untitled Case',
+          nameRu: caseItem.title || caseItem.nameRu || 'Untitled Case',
+          nameLv: caseItem.title || caseItem.nameLv || 'Untitled Case',
+          
+          // Цена/Порог входа
           threshold: caseItem.threshold ?? caseItem.threshold_eur ?? 0,
+          
+          // Картинка
           image: caseItem.image || caseItem.image_url || '',
-          // Бэкенд теперь возвращает статус (draft/published), используем его
-          status: caseItem.status || 'draft',
+          
+          // Тип кейса
+          type: caseItem.type || 'daily',
+          
+          // Статус
+          status: caseItem.status || (caseItem.is_active ? 'published' : 'draft'),
+          
           contents: caseItem.contents || [],
           lastModified: new Date(caseItem.lastModified || caseItem.updatedAt || Date.now()),
         })));
@@ -143,17 +157,23 @@ export function CasesPage({ userRole }: CasesPageProps) {
 
       let response;
       if (selectedCase && caseId) {
-        // ИСПРАВЛЕНИЕ: Используем PUT метод для обновления существующего кейса
+        // ✅ Используем PUT метод для обновления существующего кейса
         response = await fetch(`/api/admin/cases/${caseId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(), // ✅ Добавлены заголовки авторизации
+          },
           body: JSON.stringify(apiPayload),
         });
       } else {
         // Создание нового кейса
         response = await fetch('/api/admin/cases', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...getAuthHeaders(), // ✅ Добавлены заголовки авторизации
+          },
           body: JSON.stringify(apiPayload),
         });
       }
@@ -177,6 +197,7 @@ export function CasesPage({ userRole }: CasesPageProps) {
     try {
       const response = await fetch(`/api/admin/cases/${caseId}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
 
       if (!response.ok) {
