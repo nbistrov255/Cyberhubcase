@@ -32,6 +32,26 @@ export const API_ENDPOINTS = {
   denyRequest: `${API_BASE}/api/admin/requests/deny`,
   returnRequest: `${API_BASE}/api/admin/requests/return`,
   
+  // Admin - Items Management
+  getAdminItems: `${API_BASE}/api/admin/items`,
+  createItem: `${API_BASE}/api/admin/items`,
+  updateItem: `${API_BASE}/api/admin/items`,
+  deleteItem: (id: string) => `${API_BASE}/api/admin/items/${id}`,
+  
+  // Admin - Cases Management
+  getAdminCases: `${API_BASE}/api/admin/cases`,
+  createCase: `${API_BASE}/api/admin/cases`,
+  updateCase: (id: string) => `${API_BASE}/api/admin/cases/${id}`,
+  deleteCase: (id: string) => `${API_BASE}/api/admin/cases/${id}`,
+  
+  // Admin - Requests Management
+  approveRequestById: (id: string) => `${API_BASE}/api/admin/requests/${id}/approve`,
+  denyRequestById: (id: string) => `${API_BASE}/api/admin/requests/${id}/deny`,
+  returnRequestById: (id: string) => `${API_BASE}/api/admin/requests/${id}/return`,
+  
+  // User History
+  getUserHistory: `${API_BASE}/api/user/history`,
+  
   // Stats & Drops
   getRecentDrops: `${API_BASE}/api/drops/recent`,
   getPublicStats: `${API_BASE}/api/stats/public`,

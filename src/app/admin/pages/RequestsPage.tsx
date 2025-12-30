@@ -59,15 +59,15 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
       // Преобразуем данные из API в формат компонента
       const formattedRequests = (data || []).map((req: any) => ({
         id: req.id,
-        requestId: req.request_id || `REQ-${req.id}`,
+        requestId: req.id, // Backend уже возвращает REQ-XXXXXX
         user: {
           nickname: req.user_nickname || 'Unknown',
           phone: req.user_phone || 'N/A',
           uuid: req.user_uuid || '',
-          tradeLink: req.trade_link || null, // ✅ Добавили Trade Link из бэкенда
+          tradeLink: req.trade_link || null,
         },
         item: {
-          name: req.item_name || 'Unknown Item',
+          name: req.item_title || 'Unknown Item',
           image: req.item_image || 'https://via.placeholder.com/100',
           rarity: req.item_rarity || 'common',
         },
@@ -118,10 +118,9 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
 
   const handleApprove = async (id: string) => {
     try {
-      const response = await fetch(API_ENDPOINTS.approveRequest, {
+      const response = await fetch(API_ENDPOINTS.approveRequestById(id), {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ request_id: id }),
       });
 
       if (!response.ok) {
@@ -138,10 +137,10 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
 
   const handleDeny = async (id: string) => {
     try {
-      const response = await fetch(API_ENDPOINTS.denyRequest, {
+      const response = await fetch(API_ENDPOINTS.denyRequestById(id), {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ request_id: id }),
+        body: JSON.stringify({ comment: 'Denied by admin' }),
       });
 
       if (!response.ok) {
@@ -158,10 +157,9 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
 
   const handleReturn = async (id: string) => {
     try {
-      const response = await fetch(API_ENDPOINTS.returnRequest, {
+      const response = await fetch(API_ENDPOINTS.returnRequestById(id), {
         method: 'POST',
         headers: getAuthHeaders(),
-        body: JSON.stringify({ request_id: id }),
       });
 
       if (!response.ok) {

@@ -129,17 +129,17 @@ export function TopBar({
         
         const data = await response.json();
         
-        if (data.success && data.spins && Array.isArray(data.spins)) {
-          const items: LiveFeedItem[] = data.spins.map((spin: any) => ({
-            id: spin.id || `${Date.now()}-${Math.random()}`,
-            itemName: spin.prize_name || 'Unknown Item',
-            itemImage: spin.prize_image || knifeImage,
-            rarity: (spin.prize_rarity || 'common').toLowerCase() as 'common' | 'rare' | 'epic' | 'legendary' | 'mythic',
-            playerName: spin.player_nickname || 'Anonymous',
-            playerAvatar: spin.player_avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop',
-            playerLevel: spin.player_level || 1,
-            caseName: spin.case_name || 'Mystery Case',
-            timestamp: spin.created_at ? new Date(spin.created_at) : new Date(),
+        if (data.success && data.drops && Array.isArray(data.drops)) {
+          const items: LiveFeedItem[] = data.drops.map((drop: any) => ({
+            id: drop.id || `${Date.now()}-${Math.random()}`,
+            itemName: drop.item_name || drop.prize_title || 'Unknown Item',
+            itemImage: drop.image || drop.image_url || knifeImage,
+            rarity: (drop.rarity || 'common').toLowerCase() as 'common' | 'rare' | 'epic' | 'legendary' | 'mythic',
+            playerName: drop.user_name || 'Anonymous',
+            playerAvatar: drop.player_avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&h=100&fit=crop',
+            playerLevel: drop.player_level || 1,
+            caseName: drop.case_name || 'Mystery Case',
+            timestamp: drop.timestamp ? new Date(drop.timestamp) : new Date(),
           }));
           setFeedItems(items);
         }
