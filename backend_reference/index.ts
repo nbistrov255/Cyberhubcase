@@ -1,4 +1,6 @@
 import express from "express";
+import http from "http"; // 🔥 WebSocket: добавлен для http.createServer
+import { Server as SocketIOServer } from "socket.io"; // 🔥 WebSocket: Socket.IO
 import cors from "cors";
 import crypto from "crypto";
 import { initDB } from "./database";
@@ -328,6 +330,14 @@ const saveCaseHandler = async (req: any, res: any) => {
       }
     }
     await db.run("COMMIT");
+    
+    // 🔥 WebSocket: Уведомляем всех клиентов об изменении кейсов
+    const io = req.app.get("io");
+    if (io) {
+        io.emit("cases:updated");
+        console.log("🔥 WebSocket: cases:updated emitted (case saved)");
+    }
+    
     res.json({ success: true, id: caseId });
   } catch (e: any) { await db.run("ROLLBACK"); res.status(500).json({ error: e.message }); }
 };
@@ -393,6 +403,13 @@ app.post("/api/cases/open", requireSession, async (req, res) => {
         await db.run(`INSERT INTO spins (user_uuid, case_id, period_key, prize_title, prize_amount_eur, rarity, image_url, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`, user_uuid, caseId, getRigaDayKey(), selected.title, selected.price_eur, selected.drop_rarity || selected.rarity, selected.image_url, Date.now());
         await db.run(`INSERT INTO inventory (user_uuid, item_id, title, type, image_url, amount_eur, sell_price_eur, rarity, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'available', ?, ?)`, user_uuid, selected.id, selected.title, selected.type, selected.image_url, selected.price_eur, selected.sell_price_eur, selected.drop_rarity || selected.rarity, Date.now(), Date.now());
         await db.run("COMMIT");
+
+        // 🔥 WebSocket: Уведомляем пользователя об обновлении инвентаря
+        const io = req.app.get("io");
+        if (io) {
+            io.to(`user:${user_uuid}`).emit(`inventory:updated:${user_uuid}`);
+            console.log(`🔥 WebSocket: inventory updated for user ${user_uuid}`);
+        }
 
         res.json({ 
             success: true, 
@@ -480,6 +497,24 @@ app.post("/api/inventory/claim", requireSession, async (req, res) => {
             // Только после успешного пополнения помечаем как 'received'
             await db.run("UPDATE inventory SET status = 'received', updated_at = ? WHERE id = ?", Date.now(), inventory_id);
             console.log("✅ Money added");
+            
+            // 🔥 WebSocket: Уведомляем пользователя об обновлении баланса
+            const io = req.app.get("io");
+            if (io) {
+                // Получаем новый баланс
+                const newBalance = await getClientBalance(user_uuid);
+                io.to(`user:${user_uuid}`).emit(`balance:updated:${user_uuid}`, { 
+                    balance: newBalance 
+                });
+                console.log(`🔥 WebSocket: balance updated for user ${user_uuid} (${newBalance}€)`);
+            }
+            
+            // 🔥 WebSocket: Уведомляем об обновлении инвентаря
+            if (io) {
+                io.to(`user:${user_uuid}`).emit(`inventory:updated:${user_uuid}`);
+                console.log(`🔥 WebSocket: inventory updated for user ${user_uuid}`);
+            }
+            
             return res.json({ success: true, type: 'money', message: `Added ${amount}€ to balance` });
         }
 
@@ -550,4 +585,66 @@ app.post("/api/admin/requests/:id/return", requireSession, async (req, res) => {
     res.json({ success: true });
 });
 
-initDB().then(async database => { db = database; app.listen(PORT, "0.0.0.0", () => console.log(`[Backend] Started on port ${PORT}`)); });
+initDB().then(async database => { 
+    db = database; 
+    
+    // 🔥 WebSocket: Создаем HTTP server и Socket.IO
+    const server = http.createServer(app);
+    const io = new SocketIOServer(server, {
+        cors: {
+            origin: "*", // В production укажите конкретный домен
+            methods: ["GET", "POST"],
+            credentials: true
+        },
+        transports: ["websocket", "polling"],
+        pingTimeout: 60000,
+        pingInterval: 25000,
+    });
+    
+    // 🔥 WebSocket: Обработчики подключения
+    io.on("connection", (socket) => {
+        console.log("🟢 Client connected:", socket.id);
+        
+        // Когда клиент идентифицируется (отправляет userId)
+        socket.on("user:identify", (data: { userId: string }) => {
+            console.log("👤 User identified:", data.userId, "socket:", socket.id);
+            // Присоединяем socket к комнате пользователя
+            socket.join(`user:${data.userId}`);
+        });
+        
+        // Обработка отключения
+        socket.on("disconnect", (reason) => {
+            console.log("🔴 Client disconnected:", socket.id, "reason:", reason);
+        });
+
+        // Обработка ошибок
+        socket.on("error", (error) => {
+            console.error("🔴 Socket error:", error);
+        });
+    });
+    
+    // 🔥 WebSocket: Health Check endpoint
+    app.get("/health", (req, res) => {
+        res.json({
+            status: "ok",
+            websocket: io.engine.clientsCount > 0 ? "active" : "idle",
+            clients: io.engine.clientsCount,
+            timestamp: new Date().toISOString()
+        });
+    });
+    
+    // 🔥 WebSocket: Делаем io доступным для всех routes
+    app.set("io", io);
+    
+    server.listen(PORT, "0.0.0.0", () => {
+        console.log("");
+        console.log("🚀 ============================================");
+        console.log("🚀  CyberHub Backend Server Started!");
+        console.log("🚀 ============================================");
+        console.log(`📡 HTTP Server: http://localhost:${PORT}`);
+        console.log(`🔌 WebSocket: ws://localhost:${PORT}`);
+        console.log(`✅ Server ready to accept connections!`);
+        console.log("🚀 ============================================");
+        console.log("");
+    });
+});

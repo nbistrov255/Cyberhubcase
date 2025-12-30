@@ -96,7 +96,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
           } else {
             toast.success(
               <div className="flex items-center gap-3">
-                <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
                 <span>Item received!</span>
               </div>,
               { duration: 4000 }
@@ -114,7 +114,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
           if (type === 'money') {
             toast.success(
               <div className="flex items-center gap-3">
-                <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
                 <span>Balance added successfully!</span>
               </div>,
               { duration: 4000 }
@@ -123,7 +123,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
           } else {
             toast.success(
               <div className="flex items-center gap-3">
-                <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
                 <span>Item received!</span>
               </div>,
               { duration: 4000 }
@@ -247,7 +247,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
         if (result.error === 'TRADE_LINK_MISSING') {
           toast.error(
             <div className="flex items-center gap-3">
-              <CircleX className="w-5 h-5 flex-shrink-0" />
+              <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
               <span>Please set your Trade Link in Profile first!</span>
             </div>,
             { duration: 5000 }
@@ -297,7 +297,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
               if (type === 'money') {
                 toast.success(
                   <div className="flex items-center gap-3">
-                    <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                    <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
                     <span>{result.message || 'Balance added successfully!'}</span>
                   </div>,
                   { duration: 4000 }
@@ -308,7 +308,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
               } else {
                 toast.success(
                   <div className="flex items-center gap-3">
-                    <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                    <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
                     <span>Request sent to Admin! Wait for approval.</span>
                   </div>,
                   { duration: 4000 }
@@ -331,7 +331,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
               if (type === 'money') {
                 toast.success(
                   <div className="flex items-center gap-3">
-                    <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                    <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
                     <span>Balance added successfully!</span>
                   </div>,
                   { duration: 4000 }
@@ -340,7 +340,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
               } else {
                 toast.success(
                   <div className="flex items-center gap-3">
-                    <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                    <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
                     <span>Item received!</span>
                   </div>,
                   { duration: 4000 }
@@ -374,7 +374,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
       
       toast.error(
         <div className="flex items-center gap-3">
-          <CircleX className="w-5 h-5 flex-shrink-0" />
+          <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
           <span>Failed: {error instanceof Error ? error.message : 'Unknown error'}</span>
         </div>,
         { duration: 6000 }
@@ -566,23 +566,6 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                       )}
                     </AnimatePresence>
 
-                    {/* Processing Status Overlay */}
-                    {item.status === 'processing' && (
-                      <div
-                        className="absolute inset-0 flex items-center justify-center"
-                        style={{
-                          background: 'rgba(0, 0, 0, 0.8)',
-                          backdropFilter: 'blur(4px)',
-                        }}
-                      >
-                        <div className="text-center">
-                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" style={{ color: '#10b981' }} />
-                          <p className="text-white font-bold">PROCESSING</p>
-                          <p className="text-xs text-gray-400 mt-1">Wait for admin</p>
-                        </div>
-                      </div>
-                    )}
-
                     {/* Type Badge */}
                     <div
                       className="absolute top-3 right-3 px-3 py-1 rounded-full text-xs font-bold uppercase"
@@ -624,6 +607,25 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                       )}
                     </div>
                   </div>
+                  
+                  {/* 🔥 GLOBAL PROCESSING OVERLAY - перекрывает ВСЮ карточку */}
+                  {item.status === 'processing' && (
+                    <div
+                      className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.75)',
+                        backdropFilter: 'blur(6px)',
+                        WebkitBackdropFilter: 'blur(6px)',
+                        borderRadius: '12px',
+                      }}
+                    >
+                      <div className="text-center">
+                        <Loader2 className="w-14 h-14 animate-spin mx-auto mb-3" style={{ color: '#10b981' }} />
+                        <p className="text-white font-bold text-base uppercase tracking-wider">PROCESSING</p>
+                        <p className="text-xs text-gray-300 mt-2">Please wait...</p>
+                      </div>
+                    </div>
+                  )}
                 </motion.div>
               ))}
             </AnimatePresence>

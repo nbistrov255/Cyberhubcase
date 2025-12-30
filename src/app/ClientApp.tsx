@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { LanguageProvider, useLanguage } from './contexts/LanguageContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { WebSocketProvider, useWebSocketEvent } from './contexts/WebSocketContext';
 import { TopBar } from './components/TopBar';
 import { CasesPage } from './components/CasesPage';
 import { CaseOpening } from './components/CaseOpening';
@@ -45,6 +46,7 @@ function ClientAppContent() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<any>(null);
   const [wonItem, setWonItem] = useState<InventoryItem | null>(null);
+  const [casesRefreshKey, setCasesRefreshKey] = useState(0); // 🔥 Key для force refresh кейсов
   const [inventory, setInventory] = useState<InventoryItem[]>([
     {
       id: '1',
@@ -155,6 +157,25 @@ function ClientAppContent() {
     // Убрали toast.success - обновление баланса происходит тихо
   };
 
+  // 🔥 WebSocket: Real-time обновление кейсов
+  useWebSocketEvent('cases:updated', () => {
+    console.log('📦 Cases updated by admin, refreshing list...');
+    // Триггерим обновление списка кейсов в CasesPage через key prop
+    setCasesRefreshKey(prev => prev + 1);
+  });
+
+  // 🔥 WebSocket: Real-time обновление баланса
+  useWebSocketEvent(`balance:updated:${profile?.id}`, (data: { balance: number }) => {
+    console.log('💰 Balance updated:', data.balance);
+    refreshProfile(); // Автообновление профиля
+  });
+
+  // 🔥 WebSocket: Real-time обновление инвентаря
+  useWebSocketEvent(`inventory:updated:${profile?.id}`, () => {
+    console.log('🎒 Inventory updated');
+    // Здесь можно добавить обновление инвентаря
+  });
+
   // Показываем индикатор загрузки при инициализации
   if (isLoading) {
     return (
@@ -184,7 +205,7 @@ function ClientAppContent() {
       />
 
       <div className="pt-48">
-        {currentPage === 'cases' && <CasesPage onCaseClick={handleCaseClick} isAuthenticated={isAuthenticated} />}
+        {currentPage === 'cases' && <CasesPage onCaseClick={handleCaseClick} isAuthenticated={isAuthenticated} key={casesRefreshKey} />}
         {currentPage === 'win' && wonItem && (
           <WinPage
             item={wonItem}
@@ -251,9 +272,10 @@ function ClientAppContent() {
 
       <Toaster 
         position="top-right"
-        offset="20px"
+        offset="70px"
         toastOptions={{
           unstyled: true,
+          duration: 4000,
           classNames: {
             toast: 'min-w-[350px] flex items-center gap-3 rounded-lg px-5 py-3 shadow-2xl border relative overflow-hidden group',
             title: 'font-bold text-sm',
@@ -279,7 +301,9 @@ export default function ClientApp() {
   return (
     <LanguageProvider>
       <AuthProvider>
-        <ClientAppContent />
+        <WebSocketProvider>
+          <ClientAppContent />
+        </WebSocketProvider>
       </AuthProvider>
     </LanguageProvider>
   );

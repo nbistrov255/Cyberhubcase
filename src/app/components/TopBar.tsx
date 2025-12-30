@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { Settings, User, DollarSign, Trophy, Box, RotateCw, Crown, Zap, Users, Circle, Diamond, Star, Flame, TrendingUp } from 'lucide-react';
+import { Settings, User, DollarSign, Trophy, Box, RotateCw, Crown, Zap, Users, Circle, Diamond, Star, Flame, TrendingUp, Wifi, WifiOff } from 'lucide-react';
 import { LiveFeedItem } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import { API_ENDPOINTS } from '../../config/api';
 
 // Заменено figma:asset импорт на прямую ссылку
@@ -81,6 +82,7 @@ export function TopBar({
   onBalanceRefresh,
 }: TopBarProps) {
   const { profile } = useAuth(); // Получаем профиль из контекста
+  const { isConnected } = useWebSocket(); // 🔥 Получаем статус WebSocket
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [feedItems, setFeedItems] = useState<LiveFeedItem[]>([]);
   const [activeFilter, setActiveFilter] = useState<'all' | 'top'>('all');
@@ -262,6 +264,39 @@ export function TopBar({
             >
               <Settings className="w-5 h-5 text-white transition-transform duration-200 group-hover:rotate-90" />
             </button>
+
+            {/* 🔥 WebSocket Connection Indicator */}
+            <div className="relative group">
+              <div 
+                className={`w-10 h-10 rounded-lg flex items-center justify-center border transition-all duration-300 ${
+                  isConnected 
+                    ? 'bg-[#4ade80]/10 border-[#4ade80]/30 hover:bg-[#4ade80]/20' 
+                    : 'bg-red-500/10 border-red-500/30 hover:bg-red-500/20 animate-pulse'
+                }`}
+                title={isConnected ? 'Connected' : 'Disconnected'}
+              >
+                {isConnected ? (
+                  <Wifi className="w-5 h-5 text-[#4ade80]" />
+                ) : (
+                  <WifiOff className="w-5 h-5 text-red-500" />
+                )}
+              </div>
+              
+              {/* Tooltip */}
+              <div className="absolute top-full mt-2 right-0 w-48 bg-black/95 backdrop-blur-lg border border-white/20 rounded-lg p-3 shadow-2xl opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity duration-200 z-50">
+                <div className="text-xs space-y-1">
+                  <div className="font-bold text-white">Real-time Connection</div>
+                  <div className={isConnected ? 'text-[#4ade80]' : 'text-red-500'}>
+                    {isConnected ? '🟢 Connected' : '🔴 Disconnected'}
+                  </div>
+                  <div className="text-gray-400 text-[10px] mt-2">
+                    {isConnected 
+                      ? 'Live updates enabled' 
+                      : 'Reconnecting...'}
+                  </div>
+                </div>
+              </div>
+            </div>
 
             {/* Login Button or Profile Avatar */}
             {!isAuthenticated ? (

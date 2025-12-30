@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight, Info, Trash2, Check, Coins } from 'lucide-react';
+import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight, Info, Trash2, Check, Coins, CircleCheck, CircleX } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useAuth } from '../contexts/AuthContext';
 import { API_ENDPOINTS, getAuthHeaders } from '../../config/api';
@@ -68,7 +68,7 @@ function CountdownTimer({ request, onUpdate }: { request: ClaimRequest; onUpdate
 }
 
 export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfileProps) {
-  const { profile } = useAuth();
+  const { profile, refreshProfile } = useAuth();
   const [tradeLink, setTradeLink] = useState('https://steamcommunity.com/tradeoffer/new/?partner=123456789&token=abcdef');
   const [isEditingTradeLink, setIsEditingTradeLink] = useState(false);
   const [isSavingLink, setIsSavingLink] = useState(false);
@@ -246,9 +246,16 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
       if (result.success) {
         const type = itemType || item.type;
         if (type === 'money' || type?.includes('money')) {
-          toast.success(result.message || 'Balance added!');
+          toast.success(
+            <div className="flex items-center gap-3">
+              <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
+              <span>{result.message || 'Balance added successfully!'}</span>
+            </div>,
+            { duration: 4000 }
+          );
           setInventory(prev => prev.filter(i => i.id !== itemId));
-          setTimeout(() => window.location.reload(), 1000);
+          // 🔥 УБРАЛИ window.location.reload() - обновляем баланс через refreshProfile
+          await refreshProfile();
         } else {
           toast.success('Request sent to Admin!');
           const newRequest: ClaimRequest = {
