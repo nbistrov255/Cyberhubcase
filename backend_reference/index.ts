@@ -58,7 +58,7 @@ async function gqlRequest<T>(query: string, variables: any = {}, token?: string)
   
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // ⚡ Увеличено до 30 сек
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // ⚡ 60 секунд для SmartShell
 
     const res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ query, variables }), signal: controller.signal });
     clearTimeout(timeoutId);
@@ -153,15 +153,15 @@ async function requireSession(req: express.Request, res: express.Response, next:
   next();
 }
 
-// 🔥 ФУНКЦИЯ ПОПОЛНЕНИЯ БОНУСОВ через SmartShell createPayment
+// 🔥 ФУНКЦИЯ ПОПОЛНЕНИЯ БОНУСОВ через SmartShell setBonus
 async function addClientDeposit(userUuid: string, amount: number): Promise<boolean> {
     console.log(`💰 [SmartShell] Adding ${amount}€ BONUS to ${userUuid}`);
     try {
         const token = await getServiceToken();
         
-        // 1. Получаем client_id (числовой ID, не UUID!)
-        const clientData = await gqlRequest<{ clients: { data: { uuid: string, id: number }[] } }>(`
-            query GetClients { clients(page: 1, first: 5000) { data { uuid id } } }
+        // 1. Получаем текущий БОНУСНЫЙ баланс клиента
+        const clientData = await gqlRequest<{ clients: { data: { uuid: string, bonus: number }[] } }>(`
+            query GetClients { clients(page: 1, first: 5000) { data { uuid bonus } } }
         `, {}, token);
         
         const client = clientData.clients?.data?.find(c => c.uuid === userUuid);
@@ -170,33 +170,27 @@ async function addClientDeposit(userUuid: string, amount: number): Promise<boole
             return false;
         }
         
-        console.log(`✅ Found client_id: ${client.id} for UUID: ${userUuid}`);
+        const currentBonus = client.bonus || 0;
+        const newBonus = currentBonus + amount;
         
-        // 2. Создаём платёж с типом BONUS (согласно документации SmartShell)
-        const paymentResult = await gqlRequest<{ createPayment: { id: string; sum: number } }>(`
-            mutation CreatePayment($input: CreatePaymentInput!) {
-                createPayment(input: $input) {
-                    id
-                    sum
+        console.log(`📊 Current BONUS: ${currentBonus}€, Adding: ${amount}€, New: ${newBonus}€`);
+        
+        // 2. Устанавливаем новый БОНУСНЫЙ баланс через setBonus
+        await gqlRequest<{ setBonus: { uuid: string; login: string } }>(`
+            mutation SetBonus($input: SetBonusInput!) {
+                setBonus(input: $input) {
+                    uuid
+                    login
                 }
             }
         `, {
             input: {
-                client_id: client.id,
-                sum: amount,
-                cash_sum: 0,  // Административное начисление (не кассовая операция)
-                card_sum: 0,
-                items: [
-                    {
-                        type: "BONUS",  // ⚡ КЛЮЧЕВОЙ ПАРАМЕТР - зачисляем на БОНУСНЫЙ счёт
-                        amount: 1,
-                        sum: amount
-                    }
-                ]
+                client_uuid: userUuid,
+                value: newBonus
             }
         }, token);
         
-        console.log(`✅ BONUS payment created: ${paymentResult.createPayment.id}, amount: ${amount}€`);
+        console.log(`✅ BONUS updated: ${newBonus}€ (added ${amount}€)`);
         return true;
     } catch (error: any) {
         console.error(`❌ Failed to add BONUS: ${error.message}`);
