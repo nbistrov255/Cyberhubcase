@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Search, Loader2, Info, Trash2, Coins } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, Info, Trash2, Coins, CircleCheck, CircleX } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -76,61 +76,122 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
         // Remove the item from the list without reloading
         setItems(prevItems => prevItems.filter(item => item.inventory_id !== inventoryId));
         
-        // Show success notification
-        toast.success(`${t('inventory.itemSold')} ${sellPrice}€`);
+        // Show success notification with icon
+        toast.success(
+          <div className="flex items-center gap-3">
+            <CircleCheck className="w-5 h-5 flex-shrink-0" />
+            <span>Sold for {sellPrice}€! Balance updated.</span>
+          </div>,
+          { duration: 4000 }
+        );
         
         // Refresh profile to update balance
         await refreshProfile();
       } else {
-        toast.error(t('inventory.errorSelling'));
+        toast.error(
+          <div className="flex items-center gap-3">
+            <CircleX className="w-5 h-5 flex-shrink-0" />
+            <span>Failed to sell item</span>
+          </div>,
+          { duration: 5000 }
+        );
       }
     } catch (error) {
       console.error('Error selling item:', error);
-      toast.error(t('inventory.errorSelling'));
+      toast.error(
+        <div className="flex items-center gap-3">
+          <CircleX className="w-5 h-5 flex-shrink-0" />
+          <span>Error selling item</span>
+        </div>,
+        { duration: 5000 }
+      );
     }
   };
 
   // Новая логика CLAIM (вставь вместо старой)
-  const handleClaimItem = async (itemId: number, type: string) => {
+  const handleClaimItem = async (itemId: number, type: string, itemTitle: string = '') => {
     if (processingId) return;
+    
     setProcessingId(itemId);
+    
+    // 1️⃣ ОПТИМИСТИЧНОЕ УДАЛЕНИЕ - убираем карточку СРАЗУ
+    const itemBackup = items.find(i => i.inventory_id === itemId);
+    setItems(prev => prev.filter(i => i.inventory_id !== itemId));
+    
     try {
+      // 2️⃣ Отправляем запрос на backend
       const response = await fetch(API_ENDPOINTS.claimItem, {
         method: 'POST',
         headers: getAuthHeaders(),
         body: JSON.stringify({ inventory_id: itemId }),
       });
+      
       const result = await response.json();
 
       if (!response.ok) {
+        // ❌ ОШИБКА - ОТКАТ: возвращаем карточку обратно
+        if (itemBackup) {
+          setItems(prev => [...prev, itemBackup]);
+        }
+        
         if (result.error === 'TRADE_LINK_MISSING') {
-          toast.error('Please set your Trade Link in Profile first!');
+          toast.error(
+            <div className="flex items-center gap-3">
+              <CircleX className="w-5 h-5 flex-shrink-0" />
+              <span>Please set your Trade Link in Profile first!</span>
+            </div>,
+            { duration: 5000 }
+          );
           return;
         }
         throw new Error(result.error);
       }
 
+      // ✅ УСПЕХ
       if (result.success) {
         if (type === 'money') {
-           toast.success(result.message || 'Balance added!');
-           // Обновляем инвентарь (убираем полученный предмет)
-           setItems(prev => prev.filter(i => i.inventory_id !== itemId));
-           // Обновляем баланс в шапке через AuthContext
-           try {
-             await refreshProfile();
-             console.log('✅ Profile refreshed successfully');
-           } catch (refreshError) {
-             console.error('⚠️ Failed to refresh profile:', refreshError);
-             // Не критично - предмет уже получен
-           }
+          // 💰 Деньги получены
+          toast.success(
+            <div className="flex items-center gap-3">
+              <CircleCheck className="w-5 h-5 flex-shrink-0" />
+              <span>{result.message || 'Balance added successfully!'}</span>
+            </div>,
+            { duration: 4000 }
+          );
+          
+          // Обновляем баланс в TopBar
+          try {
+            await refreshProfile();
+            console.log('✅ Profile refreshed successfully');
+          } catch (refreshError) {
+            console.error('⚠️ Failed to refresh profile:', refreshError);
+          }
         } else {
-           toast.success('Request sent to Admin!');
-           setItems(prev => prev.map(i => i.inventory_id === itemId ? { ...i, status: 'processing' } : i));
+          // 📦 Заявка на вывод создана
+          toast.success(
+            <div className="flex items-center gap-3">
+              <CircleCheck className="w-5 h-5 flex-shrink-0" />
+              <span>Request sent to Admin! Wait for approval.</span>
+            </div>,
+            { duration: 4000 }
+          );
         }
       }
     } catch (error) {
+      // ❌ КРИТИЧЕСКАЯ ОШИБКА - ОТКАТ: возвращаем карточку обратно
       console.error('❌ Claim error:', error);
-      toast.error(`Failed to claim: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      if (itemBackup) {
+        setItems(prev => [...prev, itemBackup]);
+      }
+      
+      toast.error(
+        <div className="flex items-center gap-3">
+          <CircleX className="w-5 h-5 flex-shrink-0" />
+          <span>Failed: {error instanceof Error ? error.message : 'Unknown error'}</span>
+        </div>,
+        { duration: 6000 }
+      );
     } finally {
       setProcessingId(null);
     }
@@ -276,7 +337,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                             whileTap={{ scale: 0.95 }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleClaimItem(item.inventory_id, item.type);
+                              handleClaimItem(item.inventory_id, item.type, item.title);
                             }}
                             className="flex-1 py-2.5 rounded-lg text-xs font-bold uppercase transition-all pointer-events-auto shadow-lg"
                             style={{

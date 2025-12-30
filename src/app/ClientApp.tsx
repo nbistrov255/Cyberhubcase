@@ -250,12 +250,17 @@ function ClientAppContent() {
       />
 
       <Toaster 
-        position="top-right"
+        position="top-center"
+        offset="80px"
         toastOptions={{
-          style: {
-            background: '#1d1d22',
-            border: '1px solid #2a2a30',
-            color: '#fff',
+          unstyled: true,
+          classNames: {
+            toast: 'min-w-[400px] flex items-center gap-4 rounded-lg px-6 py-4 shadow-2xl backdrop-blur-md border-2',
+            title: 'font-semibold',
+            description: 'text-sm',
+            success: 'bg-[#1d1d22]/95 border-[#4ade80]',
+            error: 'bg-[#1d1d22]/95 border-[#7c2d3a]',
+            info: 'bg-[#1d1d22]/95 border-[#2a2a30]',
           },
         }}
       />
