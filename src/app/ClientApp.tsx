@@ -250,17 +250,24 @@ function ClientAppContent() {
       />
 
       <Toaster 
-        position="top-center"
-        offset="80px"
+        position="top-right"
+        offset="20px"
         toastOptions={{
           unstyled: true,
           classNames: {
-            toast: 'min-w-[400px] flex items-center gap-4 rounded-lg px-6 py-4 shadow-2xl backdrop-blur-md border-2',
-            title: 'font-semibold',
-            description: 'text-sm',
-            success: 'bg-[#1d1d22]/95 border-[#4ade80]',
-            error: 'bg-[#1d1d22]/95 border-[#7c2d3a]',
-            info: 'bg-[#1d1d22]/95 border-[#2a2a30]',
+            toast: 'min-w-[350px] flex items-center gap-3 rounded-lg px-5 py-3 shadow-2xl border relative overflow-hidden group',
+            title: 'font-bold text-sm',
+            description: 'text-xs',
+            success: 'border-[rgba(74,222,128,0.3)]',
+            error: 'border-[rgba(239,68,68,0.3)]',
+            info: 'border-[rgba(255,255,255,0.1)]',
+          },
+          style: {
+            background: 'linear-gradient(135deg, rgba(29, 29, 34, 0.95) 0%, rgba(23, 23, 28, 0.95) 100%)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
+            boxShadow: '0 0 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)',
+            color: '#ffffff',
           },
         }}
       />

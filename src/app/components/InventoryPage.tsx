@@ -37,6 +37,113 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
     fetchInventory();
   }, []);
 
+  // 🔥 AUTO-RESTART POLLING для processing items при возвращении на страницу
+  useEffect(() => {
+    if (loading) return;
+    
+    // Находим все items со status='processing'
+    const processingItems = items.filter(item => item.status === 'processing');
+    
+    if (processingItems.length === 0) return;
+    
+    console.log(`🔄 Found ${processingItems.length} processing items, restarting polling...`);
+    
+    // Для каждого processing item запускаем polling
+    processingItems.forEach(item => {
+      startPolling(item.inventory_id, item.type);
+    });
+  }, [loading]); // Запускаем только после загрузки
+  
+  const startPolling = (itemId: number, type: string) => {
+    console.log(`🔄 Starting polling for item ${itemId}...`);
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const inventoryResponse = await fetch(API_ENDPOINTS.getInventory, { 
+          headers: getAuthHeaders() 
+        });
+        
+        if (!inventoryResponse.ok) {
+          console.error('❌ Polling failed: API error');
+          return;
+        }
+        
+        const inventoryData = await inventoryResponse.json();
+        const rawItems = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
+        const normalizedItems = rawItems.map((item: any) => ({
+          ...item,
+          inventory_id: item.id,
+          price_eur: item.price_eur || item.amount_eur || 0,
+        }));
+        
+        const currentItem = normalizedItems.find((i: any) => i.id === itemId);
+        
+        if (!currentItem) {
+          console.log(`✅ Item ${itemId} disappeared = получен!`);
+          clearInterval(pollInterval);
+          
+          setItems(prev => prev.filter(i => i.inventory_id !== itemId));
+          
+          if (type === 'money') {
+            toast.success(
+              <div className="flex items-center gap-3">
+                <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
+                <span>Balance added successfully!</span>
+              </div>,
+              { duration: 4000 }
+            );
+            await refreshProfile();
+          } else {
+            toast.success(
+              <div className="flex items-center gap-3">
+                <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                <span>Item received!</span>
+              </div>,
+              { duration: 4000 }
+            );
+          }
+          return;
+        }
+        
+        if (currentItem.status === 'received') {
+          console.log(`✅ Item ${itemId} status = 'received'`);
+          clearInterval(pollInterval);
+          
+          setItems(prev => prev.filter(i => i.inventory_id !== itemId));
+          
+          if (type === 'money') {
+            toast.success(
+              <div className="flex items-center gap-3">
+                <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                <span>Balance added successfully!</span>
+              </div>,
+              { duration: 4000 }
+            );
+            await refreshProfile();
+          } else {
+            toast.success(
+              <div className="flex items-center gap-3">
+                <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                <span>Item received!</span>
+              </div>,
+              { duration: 4000 }
+            );
+          }
+        } else {
+          console.log(`⏳ Item ${itemId} status = '${currentItem.status}', waiting...`);
+        }
+      } catch (pollError) {
+        console.error('❌ Polling error:', pollError);
+      }
+    }, 2000);
+    
+    // Timeout 120 секунд
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      console.log(`⏱ Polling timeout for item ${itemId}`);
+    }, 120000);
+  };
+
   const fetchInventory = async () => {
     try {
       setLoading(true);
@@ -50,7 +157,9 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
         inventory_id: item.id,
         price_eur: item.price_eur || item.amount_eur || 0,
       }));
-      setItems(normalizedItems); // БЕЗ .filter()
+      
+      // 🔥 ФИЛЬТРУЕМ ТОЛЬКО полученные items (status='received')
+      setItems(normalizedItems.filter((item: any) => item.status !== 'received'));
     } catch (error) {
       toast.error(t('inventory.errorLoading'));
     } finally {
@@ -79,7 +188,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
         // Show success notification with icon
         toast.success(
           <div className="flex items-center gap-3">
-            <CircleCheck className="w-5 h-5 flex-shrink-0" />
+            <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
             <span>Sold for {sellPrice}€! Balance updated.</span>
           </div>,
           { duration: 4000 }
@@ -90,7 +199,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
       } else {
         toast.error(
           <div className="flex items-center gap-3">
-            <CircleX className="w-5 h-5 flex-shrink-0" />
+            <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
             <span>Failed to sell item</span>
           </div>,
           { duration: 5000 }
@@ -100,7 +209,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
       console.error('Error selling item:', error);
       toast.error(
         <div className="flex items-center gap-3">
-          <CircleX className="w-5 h-5 flex-shrink-0" />
+          <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
           <span>Error selling item</span>
         </div>,
         { duration: 5000 }
@@ -108,15 +217,16 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
     }
   };
 
-  // Новая логика CLAIM (вставь вместо старой)
+  // 🔥 НОВАЯ ЛОГИКА: НЕТ оптимистичного удаления, polling до success
   const handleClaimItem = async (itemId: number, type: string, itemTitle: string = '') => {
     if (processingId) return;
     
     setProcessingId(itemId);
     
-    // 1️⃣ ОПТИМИСТИЧНОЕ УДАЛЕНИЕ - убираем карточку СРАЗУ
-    const itemBackup = items.find(i => i.inventory_id === itemId);
-    setItems(prev => prev.filter(i => i.inventory_id !== itemId));
+    // 1️⃣ Устанавливаем status='processing' локально (показываем loader на карточке)
+    setItems(prev => prev.map(i => 
+      i.inventory_id === itemId ? { ...i, status: 'processing' as const } : i
+    ));
     
     try {
       // 2️⃣ Отправляем запрос на backend
@@ -129,10 +239,10 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
       const result = await response.json();
 
       if (!response.ok) {
-        // ❌ ОШИБКА - ОТКАТ: возвращаем карточку обратно
-        if (itemBackup) {
-          setItems(prev => [...prev, itemBackup]);
-        }
+        // ❌ ОШИБКА - ОТКАТ: возвращаем status='available'
+        setItems(prev => prev.map(i => 
+          i.inventory_id === itemId ? { ...i, status: 'available' as const } : i
+        ));
         
         if (result.error === 'TRADE_LINK_MISSING') {
           toast.error(
@@ -142,48 +252,125 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
             </div>,
             { duration: 5000 }
           );
+          setProcessingId(null);
           return;
         }
         throw new Error(result.error);
       }
 
-      // ✅ УСПЕХ
+      // ✅ Запрос принят - начинаем POLLING
       if (result.success) {
-        if (type === 'money') {
-          // 💰 Деньги получены
-          toast.success(
-            <div className="flex items-center gap-3">
-              <CircleCheck className="w-5 h-5 flex-shrink-0" />
-              <span>{result.message || 'Balance added successfully!'}</span>
-            </div>,
-            { duration: 4000 }
-          );
-          
-          // Обновляем баланс в TopBar
+        console.log(`🔄 Starting polling for item ${itemId}...`);
+        
+        // Запускаем polling каждые 2 секунды
+        const pollInterval = setInterval(async () => {
           try {
-            await refreshProfile();
-            console.log('✅ Profile refreshed successfully');
-          } catch (refreshError) {
-            console.error('⚠️ Failed to refresh profile:', refreshError);
+            const inventoryResponse = await fetch(API_ENDPOINTS.getInventory, { 
+              headers: getAuthHeaders() 
+            });
+            
+            if (!inventoryResponse.ok) {
+              console.error('❌ Polling failed: API error');
+              return;
+            }
+            
+            const inventoryData = await inventoryResponse.json();
+            const rawItems = Array.isArray(inventoryData) ? inventoryData : (inventoryData.items || []);
+            const normalizedItems = rawItems.map((item: any) => ({
+              ...item,
+              inventory_id: item.id,
+              price_eur: item.price_eur || item.amount_eur || 0,
+            }));
+            
+            // Проверяем статус нашего item
+            const currentItem = normalizedItems.find((i: any) => i.id === itemId);
+            
+            if (!currentItem) {
+              // Item исчез из inventory (значит получен и удалён backend'ом)
+              console.log(`✅ Item ${itemId} disappeared = успешно получен!`);
+              clearInterval(pollInterval);
+              
+              // Убираем из списка
+              setItems(prev => prev.filter(i => i.inventory_id !== itemId));
+              
+              // Показываем success toast
+              if (type === 'money') {
+                toast.success(
+                  <div className="flex items-center gap-3">
+                    <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                    <span>{result.message || 'Balance added successfully!'}</span>
+                  </div>,
+                  { duration: 4000 }
+                );
+                
+                // Обновляем баланс в TopBar
+                await refreshProfile();
+              } else {
+                toast.success(
+                  <div className="flex items-center gap-3">
+                    <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                    <span>Request sent to Admin! Wait for approval.</span>
+                  </div>,
+                  { duration: 4000 }
+                );
+              }
+              
+              setProcessingId(null);
+              return;
+            }
+            
+            // Обновляем status в UI (если backend вернул другой статус)
+            if (currentItem.status === 'received') {
+              console.log(`✅ Item ${itemId} status = 'received'`);
+              clearInterval(pollInterval);
+              
+              // Убираем из списка (фильтр в fetchInventory уберёт received)
+              setItems(prev => prev.filter(i => i.inventory_id !== itemId));
+              
+              // Показываем success toast
+              if (type === 'money') {
+                toast.success(
+                  <div className="flex items-center gap-3">
+                    <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                    <span>Balance added successfully!</span>
+                  </div>,
+                  { duration: 4000 }
+                );
+                await refreshProfile();
+              } else {
+                toast.success(
+                  <div className="flex items-center gap-3">
+                    <CircleCheck className="w-5 h-5 flex-shrink-0" />
+                    <span>Item received!</span>
+                  </div>,
+                  { duration: 4000 }
+                );
+              }
+              
+              setProcessingId(null);
+            } else {
+              // Ещё processing, продолжаем ждать
+              console.log(`⏳ Item ${itemId} status = '${currentItem.status}', waiting...`);
+            }
+          } catch (pollError) {
+            console.error('❌ Polling error:', pollError);
           }
-        } else {
-          // 📦 Заявка на вывод создана
-          toast.success(
-            <div className="flex items-center gap-3">
-              <CircleCheck className="w-5 h-5 flex-shrink-0" />
-              <span>Request sent to Admin! Wait for approval.</span>
-            </div>,
-            { duration: 4000 }
-          );
-        }
+        }, 2000); // Проверяем каждые 2 секунды
+        
+        // Таймаут 120 секунд (если больше - прерываем polling)
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          console.log(`⏱ Polling timeout for item ${itemId}`);
+          setProcessingId(null);
+        }, 120000);
       }
     } catch (error) {
-      // ❌ КРИТИЧЕСКАЯ ОШИБКА - ОТКАТ: возвращаем карточку обратно
+      // ❌ КРИТИЧЕСКАЯ ОШИБКА - ОТКАТ
       console.error('❌ Claim error:', error);
       
-      if (itemBackup) {
-        setItems(prev => [...prev, itemBackup]);
-      }
+      setItems(prev => prev.map(i => 
+        i.inventory_id === itemId ? { ...i, status: 'available' as const } : i
+      ));
       
       toast.error(
         <div className="flex items-center gap-3">
@@ -192,7 +379,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
         </div>,
         { duration: 6000 }
       );
-    } finally {
+      
       setProcessingId(null);
     }
   };
