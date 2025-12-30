@@ -28,6 +28,11 @@ const rarityColors = {
   epic: '#a855f7',
   legendary: '#eab308',
   mythic: '#ef4444',
+  Common: '#6b7280',
+  Rare: '#3b82f6',
+  Epic: '#a855f7',
+  Legendary: '#eab308',
+  Mythic: '#ef4444',
 };
 
 // Generate random request ID
@@ -76,6 +81,9 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
   const [profileBackground, setProfileBackground] = useState('https://i.ibb.co/0jf2XZFw/Chat-GPT-Image-25-2025-00-01-32.png');
   const [inventory, setInventory] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
+  
+  const [winHistory, setWinHistory] = useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(true);
 
   // Загрузка фона профиля из настроек
   useEffect(() => {
@@ -92,21 +100,25 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     }
   }, []);
 
-  // Загрузка инвентаря из API
+  // ✅ ЗАГРУЗКА ИНВЕНТАРЯ (ИСПРАВЛЕНО)
   useEffect(() => {
     const fetchInventory = async () => {
       try {
         setLoadingInventory(true);
-        const token = localStorage.getItem('session_token');
         const response = await fetch('/api/inventory', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: getAuthHeaders(),
         });
 
         if (response.ok) {
           const data = await response.json();
-          setInventory(Array.isArray(data) ? data : []);
+          // ✅ Бэкенд возвращает { items: [...] }, а не просто массив
+          const items = data.items || (Array.isArray(data) ? data : []);
+          
+          setInventory(items.map((item: any) => ({
+             ...item,
+             id: item.inventory_id || item.id, // Нормализация ID
+             date: new Date(item.created_at || Date.now())
+          })));
         } else {
           setInventory([]);
         }
@@ -121,12 +133,46 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     fetchInventory();
   }, []);
 
+  // ✅ ЗАГРУЗКА ИСТОРИИ (НОВОЕ)
+  useEffect(() => {
+    const fetchHistory = async () => {
+      try {
+        setLoadingHistory(true);
+        // Используем новый эндпоинт, который мы добавили в бэкенд
+        const response = await fetch('/api/user/history', {
+            headers: getAuthHeaders(),
+        });
+
+        if (response.ok) {
+            const data = await response.json();
+            const history = data.history || [];
+            
+            setWinHistory(history.map((spin: any) => ({
+                id: spin.id,
+                itemName: spin.prize_title,
+                itemImage: spin.image_url,
+                rarity: spin.rarity || 'common',
+                // Case name пока не хранится в spins, ставим заглушку или берем из логики
+                caseName: 'Case Drop', 
+                timestamp: new Date(spin.created_at)
+            })));
+        }
+      } catch (e) {
+          console.error("History error:", e);
+      } finally {
+          setLoadingHistory(false);
+      }
+    };
+    
+    fetchHistory();
+  }, []);
+
   // Расчет уровня и XP на основе депозитов
   const level = profile?.level || Math.floor((profile?.dailySum || 0) / 100) + 1;
   const currentXP = (profile?.dailySum || 0) % 100;
   const requiredXP = 100;
   const xpProgress = (currentXP / requiredXP) * 100;
-  const openedCases = profile?.openedCases || 0;
+  const openedCases = profile?.openedCases || winHistory.length || 0; // ✅ Берем из истории, если в профиле нет
 
   // Имя и аватар игрока из профиля
   const displayName = profile?.nickname || playerName;
@@ -139,8 +185,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
   const endIndex = startIndex + ITEMS_PER_PAGE;
   const currentItems = inventory.slice(startIndex, endIndex);
 
-  // Win History - пока пустой массив (нет API endpoint)
-  const winHistory: any[] = [];
+  // Win History Pagination
   const totalWinHistoryPages = Math.ceil(winHistory.length / ITEMS_PER_PAGE);
   const winHistoryStartIndex = winHistoryPage * ITEMS_PER_PAGE;
   const winHistoryEndIndex = winHistoryStartIndex + ITEMS_PER_PAGE;
@@ -773,6 +818,15 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
               }}
             >
               <AnimatePresence mode="wait">
+                {loadingHistory ? (
+                  <div className="text-center py-20">
+                    <p className="text-gray-400">Loading history...</p>
+                  </div>
+                ) : winHistory.length === 0 ? (
+                  <div className="text-center py-20">
+                    <p className="text-gray-400">No history yet.</p>
+                  </div>
+                ) : (
                 <motion.div
                   key={winHistoryPage}
                   initial={{ opacity: 0, x: 20 }}
@@ -950,6 +1004,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                     );
                   })}
                 </motion.div>
+                )}
               </AnimatePresence>
             </div>
           </div>
