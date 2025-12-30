@@ -113,9 +113,10 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
       if (result.success) {
         if (type === 'money') {
            toast.success(result.message || 'Balance added!');
+           // Обновляем инвентарь (убираем полученный предмет)
            setItems(prev => prev.filter(i => i.inventory_id !== itemId));
-           // Перезагрузка для обновления баланса в шапке
-           setTimeout(() => window.location.reload(), 1000); 
+           // Обновляем баланс в шапке через AuthContext
+           await refreshProfile();
         } else {
            toast.success('Request sent to Admin!');
            setItems(prev => prev.map(i => i.inventory_id === itemId ? { ...i, status: 'processing' } : i));

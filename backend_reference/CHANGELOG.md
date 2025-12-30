@@ -4,6 +4,28 @@
 
 ---
 
+## [2024-12-30] - Исправлен баг с перезагрузкой страницы при claim денег
+
+### Fixed:
+- **Frontend Bug**: Убран `window.location.reload()` из `InventoryPage.tsx` при claim предметов типа `money`
+- Теперь используется `refreshProfile()` из AuthContext для обновления баланса без перезагрузки
+- Пользователь остаётся на странице инвентаря после получения денег
+
+**Затронутые файлы:**
+- `/src/app/components/InventoryPage.tsx` - строка 118
+
+**До:**
+```typescript
+setTimeout(() => window.location.reload(), 1000);
+```
+
+**После:**
+```typescript
+await refreshProfile();
+```
+
+---
+
 ## [INITIAL] - 2024-12-30
 
 ### ✅ Создана структура Backend Reference
