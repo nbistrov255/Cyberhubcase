@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Search, Loader2, Info, Trash2 } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, Info, Trash2, Coins } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -253,86 +253,57 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
                     />
 
-                    {/* 🔴 DEBUG: Hover Overlay - проверьте console.log при наведении */}
+                    {/* Action Buttons - Shows on Hover at Bottom */}
                     <AnimatePresence>
                       {hoveredItem === item.inventory_id && item.status !== 'processing' && (
                         <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="absolute inset-0 flex items-center justify-center gap-3 p-4"
-                          style={{
-                            background: 'rgba(0, 0, 0, 0.8)',
-                            backdropFilter: 'blur(4px)',
-                          }}
-                          onAnimationComplete={() => console.log('🔴 DEBUG: Hover overlay shown for item type:', item.type)}
+                          initial={{ opacity: 0, y: 10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 10 }}
+                          className="absolute bottom-3 left-3 right-3 z-50 pointer-events-none flex gap-2"
                         >
-                          {/* 🔴 DEBUG: Проверьте тип предмета - {item.type} */}
-                          {item.type !== 'money' ? (
-                            <>
-                              {/* 🔴 Зеленая кнопка ПОЛУЧИТЬ слева */}
-                              <motion.button
-                                initial={{ scale: 0.9 }}
-                                animate={{ scale: 1 }}
-                                exit={{ scale: 0.9 }}
-                                onClick={() => {
-                                  console.log('🔴 DEBUG: ПОЛУЧИТЬ clicked for type:', item.type);
-                                  handleClaimItem(item.inventory_id, item.type);
-                                }}
-                                className="flex-1 px-4 py-3 rounded-lg font-bold uppercase transition-all text-sm"
-                                style={{
-                                  background: '#10b981',
-                                  color: '#ffffff',
-                                  border: '2px solid #059669',
-                                }}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                ПОЛУЧИТЬ
-                              </motion.button>
+                          {/* Green ПОЛУЧИТЬ Button */}
+                          <motion.button
+                            whileHover={{ y: -2 }}
+                            whileTap={{ scale: 0.95 }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleClaimItem(item.inventory_id, item.type);
+                            }}
+                            className="flex-1 py-2.5 rounded-lg text-xs font-bold uppercase transition-all pointer-events-auto shadow-lg"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
+                              backdropFilter: 'blur(10px)',
+                              WebkitBackdropFilter: 'blur(10px)',
+                              border: '1px solid rgba(16, 185, 129, 0.6)',
+                              color: '#10b981',
+                              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
+                            }}
+                          >
+                            ПОЛУЧИТЬ
+                          </motion.button>
 
-                              {/* 🔴 Красная кнопка SELL справа с иконкой корзины */}
-                              <motion.button
-                                initial={{ scale: 0.9 }}
-                                animate={{ scale: 1 }}
-                                exit={{ scale: 0.9 }}
-                                onClick={() => {
-                                  console.log('🔴 DEBUG: SELL clicked, price:', item.sell_price_eur);
-                                  handleSellItem(item.inventory_id, item.sell_price_eur, item.title);
-                                }}
-                                className="flex-1 px-4 py-3 rounded-lg font-bold uppercase transition-all flex items-center justify-center gap-2 text-sm"
-                                style={{
-                                  background: '#7c2d3a',
-                                  color: '#ffffff',
-                                  border: '2px solid #9a3b4a',
-                                }}
-                                whileHover={{ scale: 1.05 }}
-                                whileTap={{ scale: 0.95 }}
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                SELL {item.sell_price_eur}€
-                              </motion.button>
-                            </>
-                          ) : (
-                            /* 🔴 DEBUG: MONEY TYPE - только одна кнопка */
+                          {/* Red Coin Icon Button - Only for non-money items */}
+                          {item.type !== 'money' && (
                             <motion.button
-                              initial={{ scale: 0.9 }}
-                              animate={{ scale: 1 }}
-                              exit={{ scale: 0.9 }}
-                              onClick={() => {
-                                console.log('🔴 DEBUG: ПОЛУЧИТЬ clicked for MONEY type');
-                                handleClaimItem(item.inventory_id, item.type);
-                              }}
-                              className="w-full px-6 py-3 rounded-lg font-bold uppercase transition-all"
-                              style={{
-                                background: '#10b981',
-                                color: '#ffffff',
-                                border: '2px solid #059669',
-                              }}
-                              whileHover={{ scale: 1.05 }}
+                              whileHover={{ y: -2 }}
                               whileTap={{ scale: 0.95 }}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleSellItem(item.inventory_id, item.sell_price_eur, item.title);
+                              }}
+                              className="w-10 h-10 rounded-lg flex items-center justify-center transition-all pointer-events-auto shadow-lg"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(185, 28, 28, 0.4) 100%)',
+                                backdropFilter: 'blur(10px)',
+                                WebkitBackdropFilter: 'blur(10px)',
+                                border: '1px solid rgba(239, 68, 68, 0.6)',
+                                color: '#ef4444',
+                                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
+                              }}
+                              title={`Sell for ${item.sell_price_eur}€`}
                             >
-                              ПОЛУЧИТЬ
+                              <Coins className="w-5 h-5" />
                             </motion.button>
                           )}
                         </motion.div>

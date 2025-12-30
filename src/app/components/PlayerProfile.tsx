@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight, Info, Trash2, Check } from 'lucide-react';
+import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight, Info, Trash2, Check, Coins } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useAuth } from '../contexts/AuthContext';
 import { API_ENDPOINTS, getAuthHeaders } from '../../config/api';
@@ -650,8 +650,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                         key={item.id}
                         onMouseEnter={() => setHoveredItemId(item.id)}
                         onMouseLeave={() => setHoveredItemId(null)}
-                        onClick={() => !hasClaimRequest && handleClaimItem(item.id)}
-                        className="relative rounded-lg overflow-hidden transition-all duration-200 cursor-pointer"
+                        className="relative rounded-lg overflow-hidden transition-all duration-200"
                         style={{
                           width: '240px',
                           height: '200px',
@@ -806,73 +805,53 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                         <AnimatePresence>
                           {isHovered && !hasClaimRequest && (
                             <motion.div
-                              initial={{ opacity: 0 }}
-                              animate={{ opacity: 1 }}
-                              exit={{ opacity: 0 }}
-                              className="absolute inset-0 flex items-center justify-center gap-2 p-3 z-50"
-                              style={{
-                                background: 'rgba(0, 0, 0, 0.85)',
-                                backdropFilter: 'blur(8px)',
-                              }}
+                              initial={{ opacity: 0, y: 10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              className="absolute bottom-3 left-3 right-3 z-50 pointer-events-none flex gap-2"
                             >
-                              {!isMoney ? (
-                                <>
-                                  {/* Green ПОЛУЧИТЬ Button */}
-                                  <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleClaimItem(item.id, itemType);
-                                    }}
-                                    className="flex-1 py-2.5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5"
-                                    style={{
-                                      background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                      color: '#ffffff',
-                                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                                    }}
-                                  >
-                                    <Check className="w-3.5 h-3.5" />
-                                    ПОЛУЧИТЬ
-                                  </motion.button>
+                              {/* Green ПОЛУЧИТЬ Button - Always visible */}
+                              <motion.button
+                                whileHover={{ y: -2 }}
+                                whileTap={{ scale: 0.95 }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleClaimItem(item.id, itemType);
+                                }}
+                                className="flex-1 py-2.5 rounded-lg text-xs font-bold font-[Aldrich] uppercase transition-all pointer-events-auto shadow-lg"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
+                                  backdropFilter: 'blur(10px)',
+                                  WebkitBackdropFilter: 'blur(10px)',
+                                  border: '1px solid rgba(16, 185, 129, 0.6)',
+                                  color: '#10b981',
+                                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
+                                }}
+                              >
+                                ПОЛУЧИТЬ
+                              </motion.button>
 
-                                  {/* Red SELL Button */}
-                                  <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleSellItem(item.id, sellPrice);
-                                    }}
-                                    className="flex-1 py-2.5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5"
-                                    style={{
-                                      background: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)',
-                                      color: '#ffffff',
-                                      border: '1px solid rgba(255, 255, 255, 0.2)',
-                                    }}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                    SELL {sellPrice}€
-                                  </motion.button>
-                                </>
-                              ) : (
-                                /* Money Type - Single Button */
+                              {/* Red Coin Icon Button - Only for non-money items */}
+                              {!isMoney && (
                                 <motion.button
-                                  whileHover={{ scale: 1.05 }}
+                                  whileHover={{ y: -2 }}
                                   whileTap={{ scale: 0.95 }}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    handleClaimItem(item.id, itemType);
+                                    handleSellItem(item.id, sellPrice);
                                   }}
-                                  className="w-full py-2.5 rounded-lg text-xs font-bold uppercase flex items-center justify-center gap-1.5"
+                                  className="w-10 h-10 rounded-lg flex items-center justify-center transition-all pointer-events-auto shadow-lg"
                                   style={{
-                                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-                                    color: '#ffffff',
-                                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                                    background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.4) 0%, rgba(185, 28, 28, 0.4) 100%)',
+                                    backdropFilter: 'blur(10px)',
+                                    WebkitBackdropFilter: 'blur(10px)',
+                                    border: '1px solid rgba(239, 68, 68, 0.6)',
+                                    color: '#ef4444',
+                                    boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
                                   }}
+                                  title={`Sell for ${sellPrice}€`}
                                 >
-                                  <Check className="w-3.5 h-3.5" />
-                                  ПОЛУЧИТЬ
+                                  <Coins className="w-5 h-5" />
                                 </motion.button>
                               )}
                             </motion.div>
