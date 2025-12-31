@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from './components/AdminLayout';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -39,6 +39,61 @@ export default function AdminApp() {
   const [currentUser, setCurrentUser] = useState<AdminUser | null>(null);
   const [adminLanguage, setAdminLanguage] = useState<'en' | 'ru' | 'lv'>('en');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true); // 🔥 НОВОЕ: проверяем сессию при загрузке
+
+  // 🔥 НОВОЕ: Проверка существующей сессии при загрузке
+  useEffect(() => {
+    const checkExistingSession = async () => {
+      const token = localStorage.getItem('session_token');
+      
+      if (!token) {
+        console.log('🔐 [AdminApp] No token found, showing login');
+        setIsCheckingSession(false);
+        return;
+      }
+
+      console.log('🔐 [AdminApp] Found token, validating...');
+      
+      try {
+        const response = await fetch('/api/admin/me', {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          console.log('❌ [AdminApp] Token invalid, clearing...');
+          localStorage.removeItem('session_token');
+          setIsCheckingSession(false);
+          return;
+        }
+
+        const data = await response.json();
+        
+        if (data.success && data.admin) {
+          console.log('✅ [AdminApp] Session restored:', data.admin.username);
+          setCurrentUser({
+            id: data.admin.id,
+            username: data.admin.username,
+            role: data.admin.role || 'owner',
+            email: data.admin.email || 'admin@cyberhub.com',
+          });
+          setCurrentPage('dashboard');
+          toast.success(`Welcome back, ${data.admin.username}!`);
+        } else {
+          localStorage.removeItem('session_token');
+        }
+      } catch (error) {
+        console.error('❌ [AdminApp] Session check error:', error);
+        localStorage.removeItem('session_token');
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    checkExistingSession();
+  }, []);
 
   const handleLogin = async (username: string, password: string) => {
     try {
@@ -103,6 +158,15 @@ export default function AdminApp() {
     setCurrentPage('login');
     toast.success('Logged out successfully');
   };
+
+  // 🔥 НОВОЕ: Показываем loader во время проверки сессии
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-[#17171c] flex items-center justify-center">
+        <div className="text-white text-lg">Checking session...</div>
+      </div>
+    );
+  }
 
   return (
     <WebSocketProvider>

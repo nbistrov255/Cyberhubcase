@@ -368,7 +368,16 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
           return;
         }
         
-        throw new Error(result.error);
+        // Любая другая ошибка - показываем её текст
+        toast.error(
+          <div className="flex items-center gap-3">
+            <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+            <span>{result.error || 'Failed to claim item'}</span>
+          </div>,
+          { duration: 6000 }
+        );
+        clearProcessingId();
+        return;
       }
 
       // ✅ Запрос принят - начинаем POLLING

@@ -18,7 +18,7 @@ interface ClaimRequest {
   itemName: string;
   itemRarity: keyof typeof rarityColors;
   timestamp: Date;
-  status: 'pending' | 'approved' | 'rejected';
+  status: 'pending' | 'approved' | 'denied'; // 🔥 ИЗМЕНЕНО: 'rejected' → 'denied'
   timeRemaining: number; // seconds
 }
 
@@ -262,13 +262,16 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
           const serverRequest = (data || []).find((r: any) => r.id === localRequest.id);
           
           if (serverRequest) {
-            if (serverRequest.status === 'approved') {
-              // ✅ Заявка одобрена
+            if (serverRequest.status === 'approved' && localRequest.status !== 'approved') {
+              // ✅ Заявка одобрена - ОБНОВЛЯЕМ СТАТУС (не удаляем сразу)
               console.log(`✅ [PlayerProfile] Request ${localRequest.id} approved!`);
               
-              // Убираем из списка
-              handleRemoveRequest(localRequest.id);
-              clearProcessingId();
+              // Обновляем статус в pop-up
+              setClaimRequests(prev => prev.map(req => 
+                req.id === localRequest.id 
+                  ? { ...req, status: 'approved' as const } 
+                  : req
+              ));
               
               // Удаляем item из inventory
               setInventory(prev => prev.filter(i => i.id !== localRequest.id));
@@ -280,12 +283,23 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                 </div>,
                 { duration: 5000 }
               );
-            } else if (serverRequest.status === 'denied' || serverRequest.status === 'expired') {
-              // ❌ Заявка отклонена или истекла
+              
+              // 🔥 АВТОЗАКРЫТИЕ через 5 секунд
+              setTimeout(() => {
+                handleRemoveRequest(localRequest.id);
+                clearProcessingId();
+              }, 5000);
+              
+            } else if ((serverRequest.status === 'denied' || serverRequest.status === 'expired') && localRequest.status !== 'denied') {
+              // ❌ Заявка отклонена или истекла - ОБНОВЛЯЕМ СТАТУС
               console.log(`❌ [PlayerProfile] Request ${localRequest.id} ${serverRequest.status}!`);
               
-              handleRemoveRequest(localRequest.id);
-              clearProcessingId();
+              // Обновляем статус в pop-up
+              setClaimRequests(prev => prev.map(req => 
+                req.id === localRequest.id 
+                  ? { ...req, status: 'denied' as const } 
+                  : req
+              ));
               
               toast.error(
                 <div className="flex items-center gap-3">
@@ -294,6 +308,12 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                 </div>,
                 { duration: 5000 }
               );
+              
+              // 🔥 АВТОЗАКРЫТИЕ через 5 секунд
+              setTimeout(() => {
+                handleRemoveRequest(localRequest.id);
+                clearProcessingId();
+              }, 5000);
             }
           }
         });
@@ -1524,6 +1544,36 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
           {claimRequests.map((request) => {
             const isMinimized = minimizedRequests.has(request.id);
             
+            // 🎨 Определяем цвет в зависимости от статуса
+            const getStatusColor = () => {
+              switch (request.status) {
+                case 'pending': return '#f59e0b'; // 🟡 Желтый/Оранжевый
+                case 'approved': return '#10b981'; // 🟢 Зеленый
+                case 'denied': return '#ef4444'; // 🔴 Красный
+                default: return '#f59e0b';
+              }
+            };
+            
+            const getStatusText = () => {
+              switch (request.status) {
+                case 'pending': return 'ОЖИДАНИЕ';
+                case 'approved': return 'ОДОБРЕНО';
+                case 'denied': return 'ОТКЛОНЕНО';
+                default: return 'ОЖИДАНИЕ';
+              }
+            };
+            
+            const getStatusIcon = () => {
+              switch (request.status) {
+                case 'pending': return <Clock className="w-5 h-5" />;
+                case 'approved': return <CheckCircle className="w-5 h-5" />;
+                case 'denied': return <CircleX className="w-5 h-5" />;
+                default: return <Clock className="w-5 h-5" />;
+              }
+            };
+            
+            const statusColor = getStatusColor();
+            
             return (
               <motion.div
                 key={request.id}
@@ -1535,62 +1585,109 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                 }}
                 exit={{ x: 400, opacity: 0 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="relative border-2 rounded-xl shadow-2xl overflow-hidden cursor-pointer"
+                className="relative rounded-xl shadow-2xl overflow-hidden"
                 style={{
                   backgroundColor: '#1a1f26',
-                  borderColor: '#dc2626',
-                  boxShadow: `0 8px 32px #dc262666`,
                 }}
               >
+                {/* 🔥 БЕГУЩАЯ ОБВОДКА (Animated Border) */}
+                <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
+                  <svg className="absolute inset-0 w-full h-full">
+                    <defs>
+                      <linearGradient id={`border-gradient-${request.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style={{ stopColor: statusColor, stopOpacity: 1 }} />
+                        <stop offset="50%" style={{ stopColor: statusColor, stopOpacity: 0.3 }} />
+                        <stop offset="100%" style={{ stopColor: statusColor, stopOpacity: 1 }} />
+                      </linearGradient>
+                    </defs>
+                    <motion.rect
+                      x="1"
+                      y="1"
+                      width="calc(100% - 2px)"
+                      height="calc(100% - 2px)"
+                      rx="12"
+                      fill="none"
+                      stroke={`url(#border-gradient-${request.id})`}
+                      strokeWidth="3"
+                      strokeDasharray={request.status === 'pending' ? "20 10" : "0"}
+                      animate={request.status === 'pending' ? {
+                        strokeDashoffset: [0, -300],
+                      } : {}}
+                      transition={{
+                        duration: 3,
+                        repeat: request.status === 'pending' ? Infinity : 0,
+                        ease: 'linear',
+                      }}
+                      style={{
+                        filter: `drop-shadow(0 0 8px ${statusColor}66)`,
+                      }}
+                    />
+                  </svg>
+                </div>
+
                 {isMinimized ? (
                   // Minimized View (Tab)
                   <div 
                     onClick={() => handleToggleMinimize(request.id)}
-                    className="p-3 flex items-center justify-between gap-2 hover:bg-white/5 transition-colors"
+                    className="relative p-3 flex items-center justify-between gap-2 hover:bg-white/5 transition-colors cursor-pointer"
                   >
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                        className="w-4 h-4 border-2 border-red-500/30 border-t-red-500 rounded-full flex-shrink-0"
-                      />
+                      {request.status === 'pending' ? (
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                          className="w-4 h-4 rounded-full flex-shrink-0"
+                          style={{
+                            border: `2px solid ${statusColor}30`,
+                            borderTopColor: statusColor,
+                          }}
+                        />
+                      ) : request.status === 'approved' ? (
+                        <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: statusColor }} />
+                      ) : (
+                        <CircleX className="w-4 h-4 flex-shrink-0" style={{ color: statusColor }} />
+                      )}
                       <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold font-[Aldrich] text-orange-400 truncate">
-                          ОЖИДАНИЕ
+                        <div className="text-xs font-bold font-[Aldrich] truncate" style={{ color: statusColor }}>
+                          {getStatusText()}
                         </div>
-                        <div className="text-xs text-gray-400 truncate">
-                          {formatTimeRemaining(request.timeRemaining)}
-                        </div>
+                        {request.status === 'pending' && (
+                          <div className="text-xs text-gray-400 truncate">
+                            {formatTimeRemaining(request.timeRemaining)}
+                          </div>
+                        )}
                       </div>
                     </div>
                     <Maximize2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
                   </div>
                 ) : (
                   // Expanded View
-                  <div className="p-4">
-                    {/* Countdown Timer */}
-                    <CountdownTimer
-                      request={request}
-                      onUpdate={(id, timeRemaining) => {
-                        setClaimRequests(prev => prev.map(req => req.id === id ? { ...req, timeRemaining } : req));
-                      }}
-                      onTimeout={(id) => {
-                        // 🔥 Таймер истёк - автоматическая отмена заявки
-                        console.log(`⏱ [PlayerProfile] Request ${id} timed out, cancelling...`);
-                        handleRemoveRequest(id);
-                        clearProcessingId();
-                        toast.error(
-                          <div className="flex items-center gap-3">
-                            <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
-                            <span>Request cancelled: Admin did not respond in 60 minutes</span>
-                          </div>,
-                          { duration: 6000 }
-                        );
-                      }}
-                    />
+                  <div className="relative p-4">
+                    {/* Countdown Timer (только для pending) */}
+                    {request.status === 'pending' && (
+                      <CountdownTimer
+                        request={request}
+                        onUpdate={(id, timeRemaining) => {
+                          setClaimRequests(prev => prev.map(req => req.id === id ? { ...req, timeRemaining } : req));
+                        }}
+                        onTimeout={(id) => {
+                          // 🔥 Таймер истёк - автоматическая отмена заявки
+                          console.log(`⏱ [PlayerProfile] Request ${id} timed out, cancelling...`);
+                          handleRemoveRequest(id);
+                          clearProcessingId();
+                          toast.error(
+                            <div className="flex items-center gap-3">
+                              <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+                              <span>Request cancelled: Admin did not respond in 60 minutes</span>
+                            </div>,
+                            { duration: 6000 }
+                          );
+                        }}
+                      />
+                    )}
                     
-                    {/* Action Buttons */}
-                    <div className="absolute top-2 right-2 flex items-center gap-1 z-10">
+                    {/* Action Button - ТОЛЬКО МИНИМИЗАЦИЯ (без крестика) */}
+                    <div className="absolute top-2 right-2 z-10">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1600,27 +1697,24 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                       >
                         <Minimize2 className="w-3 h-3" />
                       </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRemoveRequest(request.id);
-                        }}
-                        className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
                     </div>
 
                     {/* Header */}
                     <div className="flex items-center gap-2 mb-3">
-                      <Clock className="w-5 h-5 text-orange-400" />
-                      <h3 className="font-bold text-sm font-[Aldrich] text-orange-400">СТАТУС ЗАЯВКИ</h3>
+                      <div style={{ color: statusColor }}>
+                        {getStatusIcon()}
+                      </div>
+                      <h3 className="font-bold text-sm font-[Aldrich]" style={{ color: statusColor }}>
+                        СТАТУС ЗАЯВКИ
+                      </h3>
                     </div>
 
                     {/* Request ID */}
                     <div className="mb-3 bg-black/40 rounded-lg p-2">
                       <div className="text-xs text-gray-400 mb-1">ID Заявки:</div>
-                      <div className="font-bold text-sm font-mono text-orange-400">#{request.requestId}</div>
+                      <div className="font-bold text-sm font-mono" style={{ color: statusColor }}>
+                        #{request.requestId}
+                      </div>
                     </div>
 
                     {/* Item Info */}
@@ -1635,31 +1729,51 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                       </div>
                     </div>
 
-                    {/* Status - Pending with Spinner */}
-                    <div className="flex items-center gap-3 p-3 bg-red-500/10 rounded-lg border border-red-500/30 mb-3">
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                        className="w-5 h-5 border-2 border-red-500/30 border-t-red-500 rounded-full flex-shrink-0"
-                      />
+                    {/* Status Display */}
+                    <div 
+                      className="flex items-center gap-3 p-3 rounded-lg border mb-3"
+                      style={{
+                        backgroundColor: `${statusColor}10`,
+                        borderColor: `${statusColor}30`,
+                      }}
+                    >
+                      {request.status === 'pending' ? (
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                          className="w-5 h-5 rounded-full flex-shrink-0"
+                          style={{
+                            border: `2px solid ${statusColor}30`,
+                            borderTopColor: statusColor,
+                          }}
+                        />
+                      ) : request.status === 'approved' ? (
+                        <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: statusColor }} />
+                      ) : (
+                        <CircleX className="w-5 h-5 flex-shrink-0" style={{ color: statusColor }} />
+                      )}
                       <div className="flex-1">
                         <div className="text-xs text-gray-400">Статус:</div>
-                        <div className="font-bold text-sm font-[Aldrich] text-red-400">
-                          Ожидание подтверждения администратора
+                        <div className="font-bold text-sm font-[Aldrich]" style={{ color: statusColor }}>
+                          {request.status === 'pending' && 'Ожидание подтверждения администратора'}
+                          {request.status === 'approved' && 'Заявка одобрена! Предмет отправлен.'}
+                          {request.status === 'denied' && 'Заявка отклонена администратором.'}
                         </div>
                       </div>
                     </div>
 
-                    {/* Countdown Display */}
-                    <div className="flex items-center justify-between p-2 bg-black/40 rounded-lg">
-                      <div className="text-xs text-gray-400">Осталось времени:</div>
-                      <div className="font-bold font-mono text-lg text-orange-400">
-                        {formatTimeRemaining(request.timeRemaining)}
+                    {/* Countdown Display (только для pending) */}
+                    {request.status === 'pending' && (
+                      <div className="flex items-center justify-between p-2 bg-black/40 rounded-lg mb-2">
+                        <div className="text-xs text-gray-400">Осталось времени:</div>
+                        <div className="font-bold font-mono text-lg" style={{ color: statusColor }}>
+                          {formatTimeRemaining(request.timeRemaining)}
+                        </div>
                       </div>
-                    </div>
+                    )}
 
                     {/* Timestamp */}
-                    <div className="mt-2 text-xs text-gray-500">
+                    <div className="text-xs text-gray-500">
                       Создано: {request.timestamp.toLocaleTimeString()}
                     </div>
                   </div>

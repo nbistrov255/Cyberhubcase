@@ -12,6 +12,8 @@ import { SettingsModal } from './components/SettingsModal';
 import { CaseContentPage } from './components/CaseContentPage';
 import { CaseOpenPage } from './components/CaseOpenPage';
 import { LoginModal } from './components/LoginModal';
+import { LoginScreen } from './components/LoginScreen';
+import { LoadingScreen } from './components/LoadingScreen'; // 🔥 НОВЫЙ ИМПОРТ
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import { toast, Toaster } from 'sonner';
 
@@ -41,7 +43,7 @@ export interface LiveFeedItem {
 
 function ClientAppContent() {
   const { language, setLanguage, t } = useLanguage();
-  const { isAuthenticated, profile, refreshProfile, isLoading } = useAuth();
+  const { isAuthenticated, profile, refreshProfile, isLoading, isAuthenticating } = useAuth(); // 🔥 Добавили isAuthenticating
   const [currentPage, setCurrentPage] = useState<Page>('cases');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedCase, setSelectedCase] = useState<any>(null);
@@ -80,6 +82,20 @@ function ClientAppContent() {
   // Получаем баланс из профиля
   const balance = profile?.dailySum || 0;
 
+  console.log('🎮 [ClientApp] State:', { isLoading, isAuthenticating, isAuthenticated });
+
+  // 🔥 WebSocket: Real-time обновление баланса - ВАЖНО: хуки ДО условных returns!
+  useWebSocketEvent(`balance:updated:${profile?.id}`, (data: { balance: number }) => {
+    console.log('💰 Balance updated:', data.balance);
+    refreshProfile(); // Автообновление профиля
+  });
+
+  // 🔥 WebSocket: Real-time обновление инвентаря
+  useWebSocketEvent(`inventory:updated:${profile?.id}`, () => {
+    console.log('🎒 Inventory updated');
+    // Здесь можно добавить обновление инвентаря
+  });
+
   // Check maintenance mode
   const isMaintenanceMode = (() => {
     try {
@@ -94,6 +110,20 @@ function ClientAppContent() {
   if (isMaintenanceMode) {
     return <MaintenanceScreen />;
   }
+
+  // 🔥 НОВАЯ ЛОГИКА: Показываем LoginScreen если не авторизован
+  if (!isLoading && !isAuthenticated) {
+    console.log('🔑 [ClientApp] Showing LoginScreen (not authenticated)');
+    return <LoginScreen />;
+  }
+
+  // 🔥 НОВОЕ: Показываем LoadingScreen пока идет проверка авторизации или процесс логина
+  if (isLoading || isAuthenticating) {
+    console.log('⏳ [ClientApp] Showing LoadingScreen:', { isLoading, isAuthenticating });
+    return <LoadingScreen />;
+  }
+
+  console.log('✅ [ClientApp] Showing main interface');
 
   const handleCaseClick = (caseData: any) => {
     // Гость может просмотреть страницу кейса, но передаем флаг авторизации
@@ -164,30 +194,6 @@ function ClientAppContent() {
     setCasesRefreshKey(prev => prev + 1);
   });
 
-  // 🔥 WebSocket: Real-time обновление баланса
-  useWebSocketEvent(`balance:updated:${profile?.id}`, (data: { balance: number }) => {
-    console.log('💰 Balance updated:', data.balance);
-    refreshProfile(); // Автообновление профиля
-  });
-
-  // 🔥 WebSocket: Real-time обновление инвентаря
-  useWebSocketEvent(`inventory:updated:${profile?.id}`, () => {
-    console.log('🎒 Inventory updated');
-    // Здесь можно добавить обновление инвентаря
-  });
-
-  // Показываем индикатор загрузки при инициализации
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[#17171c] text-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="inline-block animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-[#7c2d3a]"></div>
-          <p className="mt-4 text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#17171c] text-white">
       <TopBar
@@ -201,7 +207,8 @@ function ClientAppContent() {
           setCurrentPage('profile-public');
         }}
         onLogoClick={() => setCurrentPage('cases')}
-        onBalanceRefresh={handleBalanceRefresh}
+        onBalanceRefresh={refreshProfile}
+        onInventoryClick={() => setCurrentPage('inventory')} // 🔥 НОВОЕ: открытие инвентаря
       />
 
       <div className="pt-48">

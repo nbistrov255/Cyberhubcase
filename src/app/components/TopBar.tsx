@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Settings, User, DollarSign, Trophy, Box, RotateCw, Crown, Zap, Users, Circle, Diamond, Star, Flame, TrendingUp, Wifi, WifiOff } from 'lucide-react';
+import { Settings, User, DollarSign, Trophy, Box, RotateCw, Crown, Zap, Users, Circle, Diamond, Star, Flame, TrendingUp, Wifi, WifiOff, LogOut, Package } from 'lucide-react';
 import { LiveFeedItem } from '../App';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAuth } from '../contexts/AuthContext';
 import { useWebSocket } from '../contexts/WebSocketContext';
 import { API_ENDPOINTS } from '../../config/api';
+import { ProfileMenu } from './ProfileMenu'; // 🔥 НОВЫЙ ИМПОРТ
 
 // Заменено figma:asset импорт на прямую ссылку
 const knifeImage = "https://i.ibb.co/cXCCBcfV/unnamed.png";
@@ -18,6 +19,7 @@ interface TopBarProps {
   onLiveFeedClick: (playerName: string) => void;
   onLogoClick?: () => void; // Добавили функцию для клика по логотипу
   onBalanceRefresh?: () => void; // Добавили функцию для обновления баланса
+  onInventoryClick?: () => void; // 🔥 НОВОЕ: функция для открытия инвентаря
 }
 
 const rarityColors = {
@@ -80,8 +82,9 @@ export function TopBar({
   onLiveFeedClick,
   onLogoClick,
   onBalanceRefresh,
+  onInventoryClick,
 }: TopBarProps) {
-  const { profile, refreshProfile } = useAuth(); // ✅ Добавлен refreshProfile
+  const { profile, refreshProfile, logout } = useAuth(); // ✅ Добавлен logout
   const { isConnected, on, off } = useWebSocket(); // ✅ Добавлены on, off для подписки
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [feedItems, setFeedItems] = useState<LiveFeedItem[]>([]);
@@ -90,6 +93,7 @@ export function TopBar({
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [stats, setStats] = useState({ casesOpened: 0, uniquePlayers: 0 });
+  const [showProfileMenu, setShowProfileMenu] = useState(false); // 🔥 НОВОЕ: состояние popup меню
 
   // 🔥 WebSocket: Подписка на обновления баланса
   useEffect(() => {
@@ -361,7 +365,7 @@ export function TopBar({
             ) : (
               // Profile Avatar with Level для авторизованных
               <button
-                onClick={onProfileClick}
+                onClick={() => setShowProfileMenu(!showProfileMenu)} // 🔥 ИЗМЕНЕНО: открываем меню вместо перехода
                 className="w-10 h-10 rounded-lg overflow-hidden relative hover:ring-2 hover:ring-white/20 transition-all"
               >
                 {/* Avatar Image */}
@@ -618,6 +622,18 @@ export function TopBar({
           </div>
         </div>
       </div>
+
+      {/* 🔥 Profile Menu Popup */}
+      <ProfileMenu
+        isOpen={showProfileMenu}
+        onClose={() => setShowProfileMenu(false)}
+        onInventoryClick={() => {
+          setShowProfileMenu(false);
+          if (onInventoryClick) {
+            onInventoryClick();
+          }
+        }}
+      />
     </>
   );
 }

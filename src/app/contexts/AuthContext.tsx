@@ -25,6 +25,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   profile: UserProfile | null;
   isLoading: boolean;
+  isAuthenticating: boolean; // 🔥 НОВОЕ: показываем LoadingScreen
   error: string | null;
   
   // Actions
@@ -52,19 +53,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticating, setIsAuthenticating] = useState(false); // 🔥 НОВОЕ: показываем LoadingScreen
   const [error, setError] = useState<string | null>(null);
 
   /**
-   * Автозагрузка профиля при старте приложения
+   * Auto-login при загрузке приложения
    */
   useEffect(() => {
     const initAuth = async () => {
       const token = getSessionToken();
       
       if (!token) {
+        console.log('🔐 [AuthContext] No saved token found');
         setIsLoading(false);
         return;
       }
+
+      console.log('🔐 [AuthContext] Found saved token, validating...');
 
       // Пытаемся загрузить профиль
       try {
@@ -72,21 +77,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           headers: getAuthHeaders(),
         });
 
+        console.log('📡 [AuthContext] Profile validation response:', response.status);
+
         if (!response.ok) {
+          console.log('❌ [AuthContext] Token invalid (status:', response.status, ')');
           throw new Error('Failed to load profile');
         }
 
         const data: GetProfileResponse = await response.json();
 
         if (data.success && data.profile) {
+          console.log('✅ [AuthContext] Session restored successfully!');
           setProfile(data.profile);
           setIsAuthenticated(true);
         } else {
+          console.log('❌ [AuthContext] Invalid profile response:', data);
           // Токен невалиден
           clearSessionToken();
         }
       } catch (err) {
-        console.error('Auto-login failed:', err);
+        console.error('❌ [AuthContext] Auto-login failed:', err);
         clearSessionToken();
       } finally {
         setIsLoading(false);
@@ -101,7 +111,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    */
   const login = async (login: string, password: string): Promise<boolean> => {
     console.log('🔐 [AuthContext] Login attempt:', { login });
-    setIsLoading(true);
+    console.log('🔐 [AuthContext] Setting isAuthenticating = true');
+    setIsAuthenticating(true);
     setError(null);
 
     try {
@@ -158,11 +169,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         
         // Загружаем профиль отдельным запросом
         try {
+          console.log('🔑 [AuthContext] Using token for profile fetch:', sessionData.session_token);
+          
           const profileResponse = await fetch(API_ENDPOINTS.getProfile, {
-            headers: getAuthHeaders(),
+            headers: {
+              'Authorization': `Bearer ${sessionData.session_token}`,
+              'Content-Type': 'application/json',
+            },
           });
 
           console.log('📥 [AuthContext] Profile fetch status:', profileResponse.status);
+          console.log('📥 [AuthContext] Profile fetch headers sent:', {
+            'Authorization': `Bearer ${sessionData.session_token.substring(0, 20)}...`,
+          });
 
           if (!profileResponse.ok) {
             throw new Error('Failed to fetch profile');
@@ -187,6 +206,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
       }
       
+      // 🎮 Показываем экран загрузки минимум 2.5 секунды (как в CS2)
+      await new Promise(resolve => setTimeout(resolve, 2500));
+      
+      console.log('✅ [AuthContext] Loading complete, setting isAuthenticating = false');
+      
       return true;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Network error';
@@ -194,7 +218,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setError(errorMsg);
       return false;
     } finally {
-      setIsLoading(false);
+      console.log('🔚 [AuthContext] Finally block - setting isAuthenticating = false');
+      setIsAuthenticating(false);
     }
   };
 
@@ -261,6 +286,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     isAuthenticated,
     profile,
     isLoading,
+    isAuthenticating,
     error,
     login,
     logout,

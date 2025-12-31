@@ -690,36 +690,78 @@ app.post("/api/user/tradelink", requireSession, async (req, res) => {
     res.json({ success: true });
 });
 
-app.get("/api/admin/requests", requireSession, async (req, res) => {
-    const requests = await db.all(`SELECT r.*, u.nickname as user_nickname, s.trade_link FROM requests r LEFT JOIN sessions u ON r.user_uuid = u.user_uuid LEFT JOIN user_settings s ON r.user_uuid = s.user_uuid ORDER BY r.created_at DESC`);
+app.get("/api/admin/requests", requireAdminSession, async (req, res) => {
+    const requests = await db.all(`
+        SELECT 
+            r.*, 
+            u.nickname as user_nickname, 
+            s.trade_link,
+            i.image_url as item_image,
+            i.rarity as item_rarity,
+            c.title as case_name
+        FROM requests r 
+        LEFT JOIN sessions u ON r.user_uuid = u.user_uuid 
+        LEFT JOIN user_settings s ON r.user_uuid = s.user_uuid
+        LEFT JOIN inventory inv ON r.inventory_id = inv.id
+        LEFT JOIN items i ON inv.item_id = i.id
+        LEFT JOIN spins sp ON sp.user_uuid = r.user_uuid AND sp.prize_title = r.item_title
+        LEFT JOIN cases c ON sp.case_id = c.id
+        ORDER BY r.created_at DESC
+    `);
     res.json(requests);
 });
 
-app.post("/api/admin/requests/:id/approve", requireSession, async (req, res) => {
-    await db.run("BEGIN TRANSACTION");
-    await db.run("UPDATE requests SET status = 'approved', updated_at = ? WHERE id = ?", Date.now(), req.params.id);
-    const reqData = await db.get("SELECT inventory_id FROM requests WHERE id = ?", req.params.id);
-    await db.run("UPDATE inventory SET status = 'received', updated_at = ? WHERE id = ?", Date.now(), reqData.inventory_id);
-    await db.run("COMMIT");
-    res.json({ success: true });
+app.post("/api/admin/requests/:id/approve", requireAdminSession, async (req, res) => {
+    try {
+        await db.run("BEGIN TRANSACTION");
+        await db.run("UPDATE requests SET status = 'approved', updated_at = ? WHERE id = ?", Date.now(), req.params.id);
+        const reqData = await db.get("SELECT inventory_id FROM requests WHERE id = ?", req.params.id);
+        
+        if (!reqData) {
+            await db.run("ROLLBACK");
+            return res.status(404).json({ error: "Request not found" });
+        }
+        
+        await db.run("UPDATE inventory SET status = 'received', updated_at = ? WHERE id = ?", Date.now(), reqData.inventory_id);
+        await db.run("COMMIT");
+        
+        console.log(`✅ [Admin] Request ${req.params.id} approved`);
+        res.json({ success: true });
+    } catch (e: any) {
+        await db.run("ROLLBACK");
+        console.error("❌ [Admin] Approve error:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
-app.post("/api/admin/requests/:id/deny", requireSession, async (req, res) => {
-    await db.run("BEGIN TRANSACTION");
-    await db.run("UPDATE requests SET status = 'denied', admin_comment = ?, updated_at = ? WHERE id = ?", req.body.comment, Date.now(), req.params.id);
-    const reqData = await db.get("SELECT inventory_id FROM requests WHERE id = ?", req.params.id);
-    await db.run("UPDATE inventory SET status = 'available', updated_at = ? WHERE id = ?", Date.now(), reqData.inventory_id);
-    await db.run("COMMIT");
-    res.json({ success: true });
+app.post("/api/admin/requests/:id/deny", requireAdminSession, async (req, res) => {
+    try {
+        await db.run("BEGIN TRANSACTION");
+        await db.run("UPDATE requests SET status = 'denied', admin_comment = ?, updated_at = ? WHERE id = ?", req.body.comment, Date.now(), req.params.id);
+        const reqData = await db.get("SELECT inventory_id FROM requests WHERE id = ?", req.params.id);
+        await db.run("UPDATE inventory SET status = 'available', updated_at = ? WHERE id = ?", Date.now(), reqData.inventory_id);
+        await db.run("COMMIT");
+        res.json({ success: true });
+    } catch (e: any) {
+        await db.run("ROLLBACK");
+        console.error("❌ [Admin] Deny error:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
-app.post("/api/admin/requests/:id/return", requireSession, async (req, res) => {
-    await db.run("BEGIN TRANSACTION");
-    await db.run("UPDATE requests SET status = 'returned', updated_at = ? WHERE id = ?", Date.now(), req.params.id);
-    const reqData = await db.get("SELECT inventory_id FROM requests WHERE id = ?", req.params.id);
-    await db.run("UPDATE inventory SET status = 'available', updated_at = ? WHERE id = ?", Date.now(), reqData.inventory_id);
-    await db.run("COMMIT");
-    res.json({ success: true });
+app.post("/api/admin/requests/:id/return", requireAdminSession, async (req, res) => {
+    try {
+        await db.run("BEGIN TRANSACTION");
+        await db.run("UPDATE requests SET status = 'returned', updated_at = ? WHERE id = ?", Date.now(), req.params.id);
+        const reqData = await db.get("SELECT inventory_id FROM requests WHERE id = ?", req.params.id);
+        await db.run("UPDATE inventory SET status = 'available', updated_at = ? WHERE id = ?", Date.now(), reqData.inventory_id);
+        await db.run("COMMIT");
+        res.json({ success: true });
+    } catch (e: any) {
+        await db.run("ROLLBACK");
+        console.error("❌ [Admin] Return error:", e);
+        res.status(500).json({ error: e.message });
+    }
 });
 
 initDB().then(async database => { 

@@ -262,7 +262,9 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
                             <button
                               onClick={() => {
                                 navigator.clipboard.writeText(request.user.tradeLink!);
-                                toast.success('Trade Link copied to clipboard!');
+                                toast.success('Trade Link copied to clipboard!', {
+                                  duration: 3000,
+                                });
                               }}
                               className="mt-1 px-2 py-1 rounded text-xs font-medium transition-colors"
                               style={{
@@ -306,7 +308,12 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
                       </td>
                       <td className="p-4 text-gray-300">{request.case}</td>
                       <td className="p-4 text-gray-300">{request.pc}</td>
-                      <td className="p-4 text-gray-300">{request.date.toLocaleDateString()}</td>
+                      <td className="p-4">
+                        <div>
+                          <p className="text-gray-300">{request.date.toLocaleDateString()}</p>
+                          <p className="text-xs text-gray-500">{request.date.toLocaleTimeString()}</p>
+                        </div>
+                      </td>
                       <td className="p-4">
                         <span
                           className="inline-block px-3 py-1 rounded-full text-xs font-medium"
