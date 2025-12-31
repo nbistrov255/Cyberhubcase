@@ -7,6 +7,8 @@ import { CaseFormModal, CaseFormData } from '../components/CaseFormModal';
 import { toast } from 'sonner';
 // ✅ ДОБАВЛЕН ИМПОРТ ЗАГОЛОВКОВ АВТОРИЗАЦИИ
 import { getAuthHeaders } from '../../../config/api';
+// ✅ ДОБАВЛЕН ИМПОРТ WebSocket ХУКА
+import { useWebSocketEvent } from '../../contexts/WebSocketContext';
 
 interface Case {
   id: string;
@@ -39,6 +41,12 @@ export function CasesPage({ userRole }: CasesPageProps) {
   useEffect(() => {
     fetchCases();
   }, []);
+
+  // ✅ ДОБАВЛЕНО: Автообновление при изменении кейсов через WebSocket
+  useWebSocketEvent('cases:updated', () => {
+    console.log('📦 Received cases:updated event, refreshing cases...');
+    fetchCases();
+  });
 
   const fetchCases = async () => {
     try {
