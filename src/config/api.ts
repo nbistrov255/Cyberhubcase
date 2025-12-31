@@ -3,7 +3,14 @@
  * Базовая конфигурация для всех запросов к backend
  */
 
-export const API_BASE = import.meta.env.VITE_API_BASE_URL || 'http://91.107.120.48:3000';
+// ✅ ИСПРАВЛЕНО: Определяем базовый URL в зависимости от окружения
+// В dev mode (localhost) используем относительные пути для работы Vite proxy
+// В production используем прямой URL
+const isDev = import.meta.env.DEV;
+export const API_BASE = isDev ? '' : (import.meta.env.VITE_API_BASE_URL || 'http://91.107.120.48:3000');
+
+console.log('🌐 [API Config] Environment:', isDev ? 'DEVELOPMENT' : 'PRODUCTION');
+console.log('🌐 [API Config] API_BASE:', API_BASE || '(using relative paths for proxy)');
 
 /**
  * API Endpoints
@@ -25,12 +32,18 @@ export const API_ENDPOINTS = {
   
   // User
   updateTradeLink: `${API_BASE}/api/user/tradelink`,
+  getUserRequests: `${API_BASE}/api/user/requests`, // 🔥 Новый endpoint для получения своих заявок
   
   // Admin
   getRequests: `${API_BASE}/api/admin/requests`,
   approveRequest: `${API_BASE}/api/admin/requests/approve`,
   denyRequest: `${API_BASE}/api/admin/requests/deny`,
   returnRequest: `${API_BASE}/api/admin/requests/return`,
+  
+  // Admin - Authentication
+  adminLogin: `${API_BASE}/api/admin/login`,
+  adminLogout: `${API_BASE}/api/admin/logout`,
+  adminMe: `${API_BASE}/api/admin/me`,
   
   // Admin - Items Management
   getAdminItems: `${API_BASE}/api/admin/items`,

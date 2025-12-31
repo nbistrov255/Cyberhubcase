@@ -86,8 +86,13 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
     try {
       const token = localStorage.getItem('session_token');
       
+      console.log('🔥 [ItemsPage] handleSaveItem called');
+      console.log('📦 [ItemsPage] itemData:', itemData);
+      console.log('🔑 [ItemsPage] token:', token ? 'EXISTS' : 'MISSING');
+      
       if (editingItem) {
         // Обновление существующего предмета
+        console.log('✏️ [ItemsPage] Updating item:', editingItem.id);
         const response = await fetch(`/api/admin/items/${editingItem.id}`, {
           method: 'PUT',
           headers: {
@@ -97,12 +102,17 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
           body: JSON.stringify(itemData),
         });
 
+        console.log('📡 [ItemsPage] PUT Response status:', response.status);
+        const responseData = await response.json();
+        console.log('📡 [ItemsPage] PUT Response data:', responseData);
+
         if (!response.ok) {
-          throw new Error('Failed to update item');
+          throw new Error(responseData.message || 'Failed to update item');
         }
         toast.success('Item updated successfully');
       } else {
         // Создание нового предмета
+        console.log('➕ [ItemsPage] Creating new item');
         const response = await fetch('/api/admin/items', {
           method: 'POST',
           headers: {
@@ -112,19 +122,24 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
           body: JSON.stringify(itemData),
         });
 
+        console.log('📡 [ItemsPage] POST Response status:', response.status);
+        const responseData = await response.json();
+        console.log('📡 [ItemsPage] POST Response data:', responseData);
+
         if (!response.ok) {
-          throw new Error('Failed to create item');
+          throw new Error(responseData.message || 'Failed to create item');
         }
         toast.success('Item created successfully');
       }
 
       // Перезагрузка списка
+      console.log('🔄 [ItemsPage] Reloading items list...');
       await fetchItems();
       setShowModal(false);
       setEditingItem(null);
     } catch (error) {
-      console.error('Error saving item:', error);
-      toast.error('Failed to save item');
+      console.error('❌ [ItemsPage] Error saving item:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save item');
     }
   };
 

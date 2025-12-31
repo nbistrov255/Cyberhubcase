@@ -81,8 +81,8 @@ export function TopBar({
   onLogoClick,
   onBalanceRefresh,
 }: TopBarProps) {
-  const { profile } = useAuth(); // Получаем профиль из контекста
-  const { isConnected } = useWebSocket(); // 🔥 Получаем статус WebSocket
+  const { profile, refreshProfile } = useAuth(); // ✅ Добавлен refreshProfile
+  const { isConnected, on, off } = useWebSocket(); // ✅ Добавлены on, off для подписки
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [feedItems, setFeedItems] = useState<LiveFeedItem[]>([]);
   const [activeFilter, setActiveFilter] = useState<'all' | 'top'>('all');
@@ -90,6 +90,34 @@ export function TopBar({
   const [lastScrollY, setLastScrollY] = useState(0);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [stats, setStats] = useState({ casesOpened: 0, uniquePlayers: 0 });
+
+  // 🔥 WebSocket: Подписка на обновления баланса
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const handleBalanceUpdate = (data: any) => {
+      console.log('💰 [TopBar] Balance updated via WebSocket:', data);
+      refreshProfile(); // Обновляем профиль (включая баланс)
+    };
+
+    const handleProfileUpdate = (data: any) => {
+      console.log('👤 [TopBar] Profile updated via WebSocket:', data);
+      refreshProfile();
+    };
+
+    // Подписываемся на события
+    on('balance:updated', handleBalanceUpdate);
+    on('profile:updated', handleProfileUpdate);
+
+    console.log('✅ [TopBar] Subscribed to balance/profile updates');
+
+    // Отписываемся при размонтировании
+    return () => {
+      off('balance:updated', handleBalanceUpdate);
+      off('profile:updated', handleProfileUpdate);
+      console.log('❌ [TopBar] Unsubscribed from balance/profile updates');
+    };
+  }, [isAuthenticated, on, off, refreshProfile]);
 
   // Загрузка статистики из API
   useEffect(() => {

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Search, Loader2, Info, Trash2, Coins, CircleCheck, CircleX } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, Info, Trash2, Coins, CircleCheck, CircleX, RotateCcw } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useLanguage } from '../contexts/LanguageContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -33,6 +33,31 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
   const [filterType, setFilterType] = useState<'all' | 'skin' | 'physical' | 'money'>('all');
   const [processingId, setProcessingId] = useState<number | null>(null);
 
+  // 🔥 HELPER: Очистка processingId и localStorage
+  const clearProcessingId = () => {
+    setProcessingId(null);
+    try {
+      localStorage.removeItem('inventory_processing_id');
+      console.log(`🗑️ [InventoryPage] Cleared processingId from localStorage`);
+    } catch (error) {
+      console.error('Error clearing processingId from localStorage:', error);
+    }
+  };
+
+  // 🔥 ВОССТАНОВЛЕНИЕ processingId из localStorage при загрузке
+  useEffect(() => {
+    try {
+      const savedProcessingId = localStorage.getItem('inventory_processing_id');
+      if (savedProcessingId) {
+        const itemId = parseInt(savedProcessingId, 10);
+        console.log(`📦 [InventoryPage] Restored processingId from localStorage: ${itemId}`);
+        setProcessingId(itemId);
+      }
+    } catch (error) {
+      console.error('Error loading processingId from localStorage:', error);
+    }
+  }, []);
+
   useEffect(() => {
     fetchInventory();
   }, []);
@@ -40,6 +65,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
   // 🔥 AUTO-RESTART POLLING для processing items при возвращении на страницу
   useEffect(() => {
     if (loading) return;
+    if (!processingId) return; // 🔥 Ждём восстановления processingId из localStorage
     
     // Находим все items со status='processing'
     const processingItems = items.filter(item => item.status === 'processing');
@@ -52,7 +78,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
     processingItems.forEach(item => {
       startPolling(item.inventory_id, item.type);
     });
-  }, [loading]); // Запускаем только после загрузки
+  }, [loading, processingId]); // 🔥 Добавлена зависимость от processingId
   
   const startPolling = (itemId: number, type: string) => {
     console.log(`🔄 Starting polling for item ${itemId}...`);
@@ -79,11 +105,14 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
         const currentItem = normalizedItems.find((i: any) => i.id === itemId);
         
         if (!currentItem) {
-          console.log(`✅ Item ${itemId} disappeared = получен!`);
+          // Item исчез из inventory (значит получен и удалён backend'ом)
+          console.log(`✅ Item ${itemId} disappeared = успешно получен!`);
           clearInterval(pollInterval);
           
+          // Убираем из списка
           setItems(prev => prev.filter(i => i.inventory_id !== itemId));
           
+          // Показываем success toast
           if (type === 'money') {
             toast.success(
               <div className="flex items-center gap-3">
@@ -92,16 +121,20 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
               </div>,
               { duration: 4000 }
             );
+            
+            // Обновляем баланс в TopBar
             await refreshProfile();
           } else {
             toast.success(
               <div className="flex items-center gap-3">
                 <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
-                <span>Item received!</span>
+                <span>Item sent to your Steam account! Check your trade offers.</span>
               </div>,
               { duration: 4000 }
             );
           }
+          
+          clearProcessingId(); // 🔥 Очищаем только когда item получен
           return;
         }
         
@@ -129,25 +162,57 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
               { duration: 4000 }
             );
           }
+          
+          clearProcessingId(); // 🔥 Очищаем localStorage + state
+        } else if (currentItem.status === 'available') {
+          // 🔥 ОТКАТ: Backend вернул item в available (ошибка на сервере)
+          console.log(`❌ Item ${itemId} rolled back to 'available'`);
+          clearInterval(pollInterval);
+          
+          // Возвращаем status='available' в UI
+          setItems(prev => prev.map(i => 
+            i.inventory_id === itemId ? { ...i, status: 'available' as const } : i
+          ));
+          
+          toast.error(
+            <div className="flex items-center gap-3">
+              <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+              <span>Server error! Please try again later.</span>
+            </div>,
+            { duration: 6000 }
+          );
+          
+          clearProcessingId();
         } else {
           console.log(`⏳ Item ${itemId} status = '${currentItem.status}', waiting...`);
         }
       } catch (pollError) {
         console.error('❌ Polling error:', pollError);
       }
-    }, 2000);
+    }, 500); // 🔥 Ускоренный polling: каждые 500мс вместо 2000мс
     
     // Timeout 120 секунд
     setTimeout(() => {
       clearInterval(pollInterval);
       console.log(`⏱ Polling timeout for item ${itemId}`);
+      clearProcessingId(); // 🔥 Очищаем localStorage при timeout
     }, 120000);
   };
 
   const fetchInventory = async () => {
     try {
       setLoading(true);
-      const response = await fetch(API_ENDPOINTS.getInventory, { headers: getAuthHeaders() });
+      
+      // 🔥 Добавляем timeout 10 секунд
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch(API_ENDPOINTS.getInventory, { 
+        headers: getAuthHeaders(),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeout);
       if (!response.ok) throw new Error('Failed');
       const data = await response.json();
       // Нормализация данных
@@ -160,8 +225,13 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
       
       // 🔥 ФИЛЬТРУЕМ ТОЛЬКО полученные items (status='received')
       setItems(normalizedItems.filter((item: any) => item.status !== 'received'));
-    } catch (error) {
-      toast.error(t('inventory.errorLoading'));
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error('❌ [InventoryPage] Inventory fetch timeout (10s)');
+        toast.error('Loading timeout. Please try again.');
+      } else {
+        toast.error(t('inventory.errorLoading'));
+      }
     } finally {
       setLoading(false);
     }
@@ -221,7 +291,31 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
   const handleClaimItem = async (itemId: number, type: string, itemTitle: string = '') => {
     if (processingId) return;
     
+    // 🔥 ПРОВЕРКА: находим item
+    const item = items.find(i => i.inventory_id === itemId);
+    if (!item) return;
+    
+    // 🔥 ПРОВЕРКА: если item уже processing - показываем ошибку
+    if (item.status === 'processing') {
+      toast.error(
+        <div className="flex items-center gap-3">
+          <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+          <span>This item is already being processed. Please wait or click Refresh.</span>
+        </div>,
+        { duration: 5000 }
+      );
+      return;
+    }
+    
     setProcessingId(itemId);
+    
+    // 🔥 СОХРАНЯЕМ processingId в localStorage
+    try {
+      localStorage.setItem('inventory_processing_id', itemId.toString());
+      console.log(`💾 [InventoryPage] Saved processingId to localStorage: ${itemId}`);
+    } catch (error) {
+      console.error('Error saving processingId to localStorage:', error);
+    }
     
     // 1️⃣ Устанавливаем status='processing' локально (показываем loader на карточке)
     setItems(prev => prev.map(i => 
@@ -252,9 +346,28 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
             </div>,
             { duration: 5000 }
           );
-          setProcessingId(null);
+          clearProcessingId();
           return;
         }
+        
+        // 🔥 Если backend возвращает "Item not available" - показываем инструкцию
+        if (result.error?.includes('not available') || result.error?.includes('processing')) {
+          toast.error(
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+                <span className="font-bold">Item is stuck in processing!</span>
+              </div>
+              <span className="text-sm text-gray-300">
+                Click the "Refresh" button in the header to reload data from server.
+              </span>
+            </div>,
+            { duration: 8000 }
+          );
+          clearProcessingId();
+          return;
+        }
+        
         throw new Error(result.error);
       }
 
@@ -298,7 +411,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                 toast.success(
                   <div className="flex items-center gap-3">
                     <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
-                    <span>{result.message || 'Balance added successfully!'}</span>
+                    <span>Balance added successfully!</span>
                   </div>,
                   { duration: 4000 }
                 );
@@ -309,13 +422,13 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                 toast.success(
                   <div className="flex items-center gap-3">
                     <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
-                    <span>Request sent to Admin! Wait for approval.</span>
+                    <span>Item sent to your Steam account! Check your trade offers.</span>
                   </div>,
                   { duration: 4000 }
                 );
               }
               
-              setProcessingId(null);
+              clearProcessingId(); // 🔥 Очищаем только когда item получен
               return;
             }
             
@@ -347,7 +460,26 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                 );
               }
               
-              setProcessingId(null);
+              clearProcessingId(); // 🔥 Очищаем localStorage + state
+            } else if (currentItem.status === 'available') {
+              // 🔥 ОТКАТ: Backend вернул item в available (ошибка на сервере)
+              console.log(`❌ Item ${itemId} rolled back to 'available'`);
+              clearInterval(pollInterval);
+              
+              // Возвращаем status='available' в UI
+              setItems(prev => prev.map(i => 
+                i.inventory_id === itemId ? { ...i, status: 'available' as const } : i
+              ));
+              
+              toast.error(
+                <div className="flex items-center gap-3">
+                  <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+                  <span>Server error! Please try again later.</span>
+                </div>,
+                { duration: 6000 }
+              );
+              
+              clearProcessingId();
             } else {
               // Ещё processing, продолжаем ждать
               console.log(`⏳ Item ${itemId} status = '${currentItem.status}', waiting...`);
@@ -355,13 +487,13 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
           } catch (pollError) {
             console.error('❌ Polling error:', pollError);
           }
-        }, 2000); // Проверяем каждые 2 секунды
+        }, 500); // 🔥 Ускоренный polling: каждые 500мс вместо 2000мс
         
         // Таймаут 120 секунд (если больше - прерываем polling)
         setTimeout(() => {
           clearInterval(pollInterval);
           console.log(`⏱ Polling timeout for item ${itemId}`);
-          setProcessingId(null);
+          clearProcessingId(); // 🔥 Очищаем localStorage при timeout
         }, 120000);
       }
     } catch (error) {
@@ -380,7 +512,7 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
         { duration: 6000 }
       );
       
-      setProcessingId(null);
+      clearProcessingId(); // 🔥 Очищаем localStorage при ошибке
     }
   };
 
@@ -413,10 +545,35 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
             <span className="text-white font-medium">{t('inventory.back')}</span>
           </button>
 
-          <h1 className="text-4xl font-bold text-white mb-2 uppercase tracking-wider">
-            {t('inventory.title')}
-          </h1>
-          <p className="text-gray-400">{t('inventory.description')}</p>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-4xl font-bold text-white mb-2 uppercase tracking-wider">
+                {t('inventory.title')}
+              </h1>
+              <p className="text-gray-400">{t('inventory.description')}</p>
+            </div>
+            
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                // 🔥 СНАЧАЛА очищаем processingId, ПОТОМ загружаем inventory
+                clearProcessingId();
+                setLoading(true);
+                fetchInventory();
+                toast.success('Refreshing inventory...');
+              }}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all self-start"
+              style={{
+                background: 'linear-gradient(135deg, #7c2d3a 0%, #5a1f2a 100%)',
+                color: '#ffffff',
+                border: '1px solid rgba(124, 45, 58, 0.5)',
+              }}
+            >
+              <RotateCcw className="w-4 h-4" />
+              Refresh
+            </motion.button>
+          </div>
         </div>
       </div>
 
@@ -526,17 +683,35 @@ export function InventoryPage({ onBack }: InventoryPageProps) {
                               e.stopPropagation();
                               handleClaimItem(item.inventory_id, item.type, item.title);
                             }}
-                            className="flex-1 py-2.5 rounded-lg text-xs font-bold uppercase transition-all pointer-events-auto shadow-lg"
+                            disabled={processingId === item.inventory_id}
+                            className="flex-1 py-2.5 rounded-lg text-xs font-bold uppercase transition-all pointer-events-auto shadow-lg flex items-center justify-center gap-2"
                             style={{
-                              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
+                              background: processingId === item.inventory_id 
+                                ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(75, 85, 99, 0.4) 100%)'
+                                : 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
                               backdropFilter: 'blur(10px)',
                               WebkitBackdropFilter: 'blur(10px)',
-                              border: '1px solid rgba(16, 185, 129, 0.6)',
-                              color: '#10b981',
+                              border: processingId === item.inventory_id
+                                ? '1px solid rgba(107, 114, 128, 0.6)'
+                                : '1px solid rgba(16, 185, 129, 0.6)',
+                              color: processingId === item.inventory_id ? '#9ca3af' : '#10b981',
                               boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
+                              cursor: processingId === item.inventory_id ? 'not-allowed' : 'pointer',
+                              opacity: processingId === item.inventory_id ? 0.7 : 1,
                             }}
                           >
-                            ПОЛУЧИТЬ
+                            {processingId === item.inventory_id ? (
+                              <>
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                  className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full"
+                                />
+                                <span>ОБРАБОТКА...</span>
+                              </>
+                            ) : (
+                              'ПОЛУЧИТЬ'
+                            )}
                           </motion.button>
 
                           {/* Red Coin Icon Button - Only for non-money items */}

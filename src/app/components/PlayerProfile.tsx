@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight, Info, Trash2, Check, Coins, CircleCheck, CircleX } from 'lucide-react';
+import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight, Info, Trash2, Check, Coins, CircleCheck, CircleX, Loader2, RotateCcw } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useAuth } from '../contexts/AuthContext';
 import { API_ENDPOINTS, getAuthHeaders } from '../../config/api';
@@ -13,7 +13,7 @@ interface PlayerProfileProps {
 }
 
 interface ClaimRequest {
-  id: string;
+  id: number; // 🔥 Изменён на number для соответствия inventory_id
   requestId: string;
   itemName: string;
   itemRarity: keyof typeof rarityColors;
@@ -53,16 +53,28 @@ function formatTimeRemaining(seconds: number): string {
 }
 
 // Countdown Timer Component
-function CountdownTimer({ request, onUpdate }: { request: ClaimRequest; onUpdate: (id: string, timeRemaining: number) => void }) {
+function CountdownTimer({ 
+  request, 
+  onUpdate,
+  onTimeout 
+}: { 
+  request: ClaimRequest; 
+  onUpdate: (id: number, timeRemaining: number) => void;
+  onTimeout?: (id: number) => void;
+}) {
   useEffect(() => {
     const interval = setInterval(() => {
       if (request.timeRemaining > 0) {
         onUpdate(request.id, request.timeRemaining - 1);
+      } else if (request.timeRemaining === 0 && onTimeout) {
+        // Таймер истёк - вызываем callback для автоотмены
+        onTimeout(request.id);
+        clearInterval(interval);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [request.id, request.timeRemaining, onUpdate]);
+  }, [request.id, request.timeRemaining, onUpdate, onTimeout]);
 
   return null;
 }
@@ -74,16 +86,75 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
   const [isSavingLink, setIsSavingLink] = useState(false);
   const [showLevelsModal, setShowLevelsModal] = useState(false);
   const [claimRequests, setClaimRequests] = useState<ClaimRequest[]>([]);
-  const [hoveredItemId, setHoveredItemId] = useState<string | null>(null);
-  const [minimizedRequests, setMinimizedRequests] = useState<Set<string>>(new Set());
+  const [hoveredItemId, setHoveredItemId] = useState<number | null>(null); // 🔥 Изменён на number
+  const [minimizedRequests, setMinimizedRequests] = useState<Set<number>>(new Set()); // 🔥 Изменён на number
   const [inventoryPage, setInventoryPage] = useState(0);
   const [winHistoryPage, setWinHistoryPage] = useState(0);
   const [profileBackground, setProfileBackground] = useState('https://i.ibb.co/0jf2XZFw/Chat-GPT-Image-25-2025-00-01-32.png');
   const [inventory, setInventory] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
+  const [processingId, setProcessingId] = useState<number | null>(null); // 🔥 Изменён на number для правильного сравнения
   
   const [winHistory, setWinHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
+
+  // 🔥 HELPER: Очистка processingId и localStorage
+  const clearProcessingId = () => {
+    setProcessingId(null);
+    try {
+      localStorage.removeItem('player_profile_processing_id');
+      console.log(`🗑️ [PlayerProfile] Cleared processingId from localStorage`);
+    } catch (error) {
+      console.error('Error clearing processingId from localStorage:', error);
+    }
+  };
+
+  // 🔥 ВОССТАНОВЛЕНИЕ processingId из localStorage при загрузке
+  useEffect(() => {
+    try {
+      const savedProcessingId = localStorage.getItem('player_profile_processing_id');
+      if (savedProcessingId) {
+        const itemId = parseInt(savedProcessingId, 10); // 🔥 Преобразуем в число!
+        console.log(`📦 [PlayerProfile] Restored processingId from localStorage: ${itemId}`);
+        setProcessingId(itemId);
+      }
+    } catch (error) {
+      console.error('Error loading processingId from localStorage:', error);
+    }
+  }, []);
+
+  // 🔥 ВОССТАНОВЛЕНИЕ claimRequests из localStorage при загрузке
+  useEffect(() => {
+    try {
+      const savedRequests = localStorage.getItem('player_profile_claim_requests');
+      if (savedRequests) {
+        const parsed = JSON.parse(savedRequests);
+        // Преобразуем timestamp обратно в Date
+        const requests = parsed.map((req: any) => ({
+          ...req,
+          timestamp: new Date(req.timestamp),
+        }));
+        console.log(`📦 [PlayerProfile] Restored ${requests.length} claim requests from localStorage`);
+        setClaimRequests(requests);
+      }
+    } catch (error) {
+      console.error('Error loading claim requests from localStorage:', error);
+    }
+  }, []);
+
+  // 🔥 СОХРАНЕНИЕ claimRequests в localStorage при изменении
+  useEffect(() => {
+    try {
+      if (claimRequests.length > 0) {
+        localStorage.setItem('player_profile_claim_requests', JSON.stringify(claimRequests));
+        console.log(`💾 [PlayerProfile] Saved ${claimRequests.length} claim requests to localStorage`);
+      } else {
+        localStorage.removeItem('player_profile_claim_requests');
+      }
+    } catch (error) {
+      console.error('Error saving claim requests to localStorage:', error);
+    }
+  }, [claimRequests]);
 
   // Загрузка фона профиля из настроек
   useEffect(() => {
@@ -100,38 +171,139 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     }
   }, []);
 
+  // 🔥 ФУНКЦИЯ загрузки инвентаря (вынесена наружу для повторного использования)
+  const fetchInventory = async () => {
+    try {
+      setLoadingInventory(true);
+      
+      // 🔥 Добавляем timeout 10 секунд
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      
+      const response = await fetch('/api/inventory', {
+        headers: getAuthHeaders(),
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeout);
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('📦 [PlayerProfile] Inventory data from backend:', data);
+        
+        // ✅ Бэкенд возвращает { items: [...] }, а не просто массив
+        const items = data.items || (Array.isArray(data) ? data : []);
+        
+        console.log(`📦 [PlayerProfile] Loaded ${items.length} items from backend`);
+        
+        setInventory(items.map((item: any) => ({
+           ...item,
+           id: item.inventory_id || item.id, // Нормализация ID
+           date: new Date(item.created_at || Date.now())
+        })));
+      } else {
+        console.error('❌ [PlayerProfile] Failed to fetch inventory:', response.status);
+        setInventory([]);
+      }
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.error('❌ [PlayerProfile] Inventory fetch timeout (10s)');
+        toast.error('Loading timeout. Please try again.');
+      } else {
+        console.error('❌ [PlayerProfile] Error fetching inventory:', error);
+      }
+      setInventory([]);
+    } finally {
+      setLoadingInventory(false);
+    }
+  };
+
   // ✅ ЗАГРУЗКА ИНВЕНТАРЯ (ИСПРАВЛЕНО)
   useEffect(() => {
-    const fetchInventory = async () => {
-      try {
-        setLoadingInventory(true);
-        const response = await fetch('/api/inventory', {
-          headers: getAuthHeaders(),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          // ✅ Бэкенд возвращает { items: [...] }, а не просто массив
-          const items = data.items || (Array.isArray(data) ? data : []);
-          
-          setInventory(items.map((item: any) => ({
-             ...item,
-             id: item.inventory_id || item.id, // Нормализация ID
-             date: new Date(item.created_at || Date.now())
-          })));
-        } else {
-          setInventory([]);
-        }
-      } catch (error) {
-        console.error('Error fetching inventory:', error);
-        setInventory([]);
-      } finally {
-        setLoadingInventory(false);
-      }
-    };
-
     fetchInventory();
   }, []);
+
+  // 🔥 AUTO-RESTART POLLING для processing items при возвращении на страницу
+  useEffect(() => {
+    if (loadingInventory) return;
+    if (!processingId) return; // 🔥 Ждём восстановления processingId из localStorage
+    
+    // Находим item с processingId
+    const processingItem = inventory.find(item => item.id === processingId);
+    
+    if (!processingItem) {
+      console.log(`⚠️ [PlayerProfile] Processing item ${processingId} not found in inventory, clearing...`);
+      clearProcessingId();
+      return;
+    }
+    
+    console.log(`🔄 [PlayerProfile] Found processing item ${processingId}, restarting polling...`);
+    // Запускаем polling для этого item
+    startPolling(processingId, processingItem.type || 'skin');
+  }, [loadingInventory, processingId, inventory]);
+
+  // 🔥 POLLING для статуса заявок (skins/physical)
+  useEffect(() => {
+    if (claimRequests.length === 0) return;
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        // Запрашиваем СВОИ заявки из backend
+        const response = await fetch(API_ENDPOINTS.getUserRequests, {
+          headers: getAuthHeaders(),
+        });
+        
+        if (!response.ok) return;
+        
+        const data = await response.json();
+        
+        // Проверяем статус каждой активной заявки
+        claimRequests.forEach((localRequest) => {
+          const serverRequest = (data || []).find((r: any) => r.id === localRequest.id);
+          
+          if (serverRequest) {
+            if (serverRequest.status === 'approved') {
+              // ✅ Заявка одобрена
+              console.log(`✅ [PlayerProfile] Request ${localRequest.id} approved!`);
+              
+              // Убираем из списка
+              handleRemoveRequest(localRequest.id);
+              clearProcessingId();
+              
+              // Удаляем item из inventory
+              setInventory(prev => prev.filter(i => i.id !== localRequest.id));
+              
+              toast.success(
+                <div className="flex items-center gap-3">
+                  <Check className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
+                  <span>Request approved! Item will be sent to your Steam account.</span>
+                </div>,
+                { duration: 5000 }
+              );
+            } else if (serverRequest.status === 'denied' || serverRequest.status === 'expired') {
+              // ❌ Заявка отклонена или истекла
+              console.log(`❌ [PlayerProfile] Request ${localRequest.id} ${serverRequest.status}!`);
+              
+              handleRemoveRequest(localRequest.id);
+              clearProcessingId();
+              
+              toast.error(
+                <div className="flex items-center gap-3">
+                  <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+                  <span>Request {serverRequest.status === 'denied' ? 'denied' : 'expired'} by admin</span>
+                </div>,
+                { duration: 5000 }
+              );
+            }
+          }
+        });
+      } catch (error) {
+        console.error('❌ [PlayerProfile] Polling error:', error);
+      }
+    }, 3000); // Проверяем каждые 3 секунды
+    
+    return () => clearInterval(pollInterval);
+  }, [claimRequests]);
 
   // ✅ ЗАГРУЗКА ИСТОРИИ (НОВОЕ)
   useEffect(() => {
@@ -223,11 +395,149 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     }
   };
 
-  const handleClaimItem = async (itemId: string, itemType?: string) => {
+  // 🔥 POLLING функция для отслеживания статуса item
+  const startPolling = (itemId: number, type: string) => {
+    console.log(`🔄 [PlayerProfile] Starting polling for item ${itemId}...`);
+    
+    const pollInterval = setInterval(async () => {
+      try {
+        const inventoryResponse = await fetch('/api/inventory', { 
+          headers: getAuthHeaders() 
+        });
+        
+        if (!inventoryResponse.ok) {
+          console.error('❌ Polling failed: API error');
+          return;
+        }
+        
+        const inventoryData = await inventoryResponse.json();
+        const rawItems = inventoryData.items || (Array.isArray(inventoryData) ? inventoryData : []);
+        const normalizedItems = rawItems.map((item: any) => ({
+          ...item,
+          id: item.inventory_id || item.id,
+        }));
+        
+        const currentItem = normalizedItems.find((i: any) => i.id === itemId);
+        
+        if (!currentItem) {
+          // Item исчез из inventory (успешно получен)
+          console.log(`✅ [PlayerProfile] Item ${itemId} disappeared = успешно получен!`);
+          clearInterval(pollInterval);
+          
+          // Убираем из списка
+          setInventory(prev => prev.filter(i => i.id !== itemId));
+          
+          // Показываем success toast
+          if (type === 'money' || type?.includes('money')) {
+            toast.success(
+              <div className="flex items-center gap-3">
+                <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
+                <span>Balance added successfully!</span>
+              </div>,
+              { duration: 4000 }
+            );
+            await refreshProfile();
+          } else {
+            toast.success(
+              <div className="flex items-center gap-3">
+                <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
+                <span>Item sent to your Steam account! Check your trade offers.</span>
+              </div>,
+              { duration: 4000 }
+            );
+          }
+          
+          clearProcessingId();
+          return;
+        }
+        
+        // Проверяем статус
+        if (currentItem.status === 'received') {
+          console.log(`✅ [PlayerProfile] Item ${itemId} status = 'received'`);
+          clearInterval(pollInterval);
+          
+          setInventory(prev => prev.filter(i => i.id !== itemId));
+          
+          if (type === 'money' || type?.includes('money')) {
+            toast.success(
+              <div className="flex items-center gap-3">
+                <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
+                <span>Balance added successfully!</span>
+              </div>,
+              { duration: 4000 }
+            );
+            await refreshProfile();
+          } else {
+            toast.success(
+              <div className="flex items-center gap-3">
+                <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
+                <span>Item received!</span>
+              </div>,
+              { duration: 4000 }
+            );
+          }
+          
+          clearProcessingId();
+        } else if (currentItem.status === 'available') {
+          // 🔥 ОТКАТ: Backend вернул item в available (ошибка на сервере)
+          console.log(`❌ [PlayerProfile] Item ${itemId} rolled back to 'available'`);
+          clearInterval(pollInterval);
+          
+          toast.error(
+            <div className="flex items-center gap-3">
+              <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+              <span>Server error! Please try again later.</span>
+            </div>,
+            { duration: 6000 }
+          );
+          
+          clearProcessingId();
+        } else {
+          console.log(`⏳ [PlayerProfile] Item ${itemId} status = '${currentItem.status}', waiting...`);
+        }
+      } catch (pollError) {
+        console.error('❌ Polling error:', pollError);
+      }
+    }, 500); // 🔥 Polling каждые 500мс
+    
+    // Timeout 120 секунд
+    setTimeout(() => {
+      clearInterval(pollInterval);
+      console.log(`⏱ [PlayerProfile] Polling timeout for item ${itemId}`);
+      clearProcessingId();
+    }, 120000);
+  };
+
+  const handleClaimItem = async (itemId: number, itemType?: string) => {
+    if (processingId) return;
+    
     const item = inventory.find(i => i.id === itemId);
     if (!item) return;
 
+    // 🔥 ПРОВЕРКА: если item уже processing на backend - показываем ошибку
+    if (item.status === 'processing') {
+      toast.error(
+        <div className="flex items-center gap-3">
+          <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+          <span>This item is already being processed. Please wait or refresh the page.</span>
+        </div>,
+        { duration: 5000 }
+      );
+      return;
+    }
+
+    setProcessingId(itemId);
+    
+    // 🔥 СОХРАНЯЕМ processingId в localStorage
     try {
+      localStorage.setItem('player_profile_processing_id', itemId.toString());
+      console.log(`💾 [PlayerProfile] Saved processingId to localStorage: ${itemId}`);
+    } catch (error) {
+      console.error('Error saving processingId to localStorage:', error);
+    }
+
+    try {
+      // Отправляем запрос на backend
       const response = await fetch(API_ENDPOINTS.claimItem, {
         method: 'POST',
         headers: getAuthHeaders(),
@@ -237,45 +547,81 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
 
       if (!response.ok) {
         if (result.error === 'TRADE_LINK_MISSING') {
-          toast.error('Please set your Trade Link first!');
+          toast.error(
+            <div className="flex items-center gap-3">
+              <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+              <span>Please set your Trade Link in Profile first!</span>
+            </div>,
+            { duration: 5000 }
+          );
+          clearProcessingId();
           return;
         }
+        
+        // 🔥 Если backend возвращает "Item not available" - показываем инструкцию
+        if (result.error?.includes('not available') || result.error?.includes('processing')) {
+          toast.error(
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+                <span className="font-bold">Item is stuck in processing!</span>
+              </div>
+              <span className="text-sm text-gray-300">
+                Click the "Refresh" button above inventory to reload data from server.
+              </span>
+            </div>,
+            { duration: 8000 }
+          );
+          clearProcessingId();
+          return;
+        }
+        
         throw new Error(result.error);
       }
 
+      // ✅ Запрос принят
       if (result.success) {
+        console.log(`🔄 [PlayerProfile] Request accepted for item ${itemId}...`);
         const type = itemType || item.type;
+        
+        // 🔥 РАЗНАЯ ЛОГИКА для money vs skins/physical
         if (type === 'money' || type?.includes('money')) {
-          toast.success(
-            <div className="flex items-center gap-3">
-              <CircleCheck className="w-5 h-5 flex-shrink-0 text-[#4ade80]" />
-              <span>{result.message || 'Balance added successfully!'}</span>
-            </div>,
-            { duration: 4000 }
-          );
-          setInventory(prev => prev.filter(i => i.id !== itemId));
-          // 🔥 УБРАЛИ window.location.reload() - обновляем баланс через refreshProfile
-          await refreshProfile();
+          // Money - мгновенный polling
+          startPolling(itemId, type);
         } else {
+          // Skins/Physical - показываем pop-up уведомление
           toast.success('Request sent to Admin!');
+          
           const newRequest: ClaimRequest = {
             id: itemId,
-            requestId: generateRequestId(),
-            itemName: item.title || item.name,
+            requestId: result.requestId || generateRequestId(), // Используем requestId из backend или генерируем
+            itemName: item.title || item.name || 'Unknown Item',
             itemRarity: (item.rarity || 'common') as keyof typeof rarityColors,
             timestamp: new Date(),
             status: 'pending',
-            timeRemaining: 3600,
+            timeRemaining: 3600, // 60 минут в секундах
           };
+          
           setClaimRequests(prev => [...prev, newRequest]);
+          // НЕ очищаем processingId - он будет показывать loader на карточке
         }
       }
     } catch (error) {
-      toast.error('Failed to claim item');
+      console.error('❌ [PlayerProfile] Claim error:', error);
+      
+      toast.error(
+        <div className="flex items-center gap-3">
+          <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+          <span>Failed: {error instanceof Error ? error.message : 'Unknown error'}</span>
+        </div>,
+        { duration: 6000 }
+      );
+      
+      clearProcessingId();
     }
   };
 
-  const handleSellItem = async (itemId: string, sellPrice: number) => {
+  const handleSellItem = async (itemId: number, sellPrice: number) => {
     try {
       const response = await fetch(API_ENDPOINTS.sellItem, {
         method: 'POST',
@@ -297,11 +643,11 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     }
   };
 
-  const handleRemoveRequest = (itemId: string) => {
+  const handleRemoveRequest = (itemId: number) => {
     setClaimRequests(prev => prev.filter(req => req.id !== itemId));
   };
 
-  const handleToggleMinimize = (itemId: string) => {
+  const handleToggleMinimize = (itemId: number) => {
     setMinimizedRequests(prev => {
       const newSet = new Set(prev);
       if (newSet.has(itemId)) {
@@ -600,7 +946,29 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
 
           {/* Inventory Block */}
           <div className="border border-white/10 rounded-2xl p-6 pr-8" style={{ backgroundColor: '#131217' }}>
-            <h2 className="text-2xl font-bold mb-6 font-[Rajdhani] uppercase">MY INVENTORY</h2>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold font-[Rajdhani] uppercase">MY INVENTORY</h2>
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  // 🔥 СНАЧАЛА очищаем processingId, ПОТОМ загружаем inventory
+                  clearProcessingId();
+                  setLoadingInventory(true);
+                  fetchInventory();
+                  toast.success('Refreshing inventory...');
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                style={{
+                  background: 'linear-gradient(135deg, #7c2d3a 0%, #5a1f2a 100%)',
+                  color: '#ffffff',
+                  border: '1px solid rgba(124, 45, 58, 0.5)',
+                }}
+              >
+                <RotateCcw className="w-4 h-4" />
+                Refresh
+              </motion.button>
+            </div>
             
             {/* Inventory Container */}
             <div 
@@ -810,7 +1178,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
 
                         {/* Action Buttons - Show on Hover */}
                         <AnimatePresence>
-                          {isHovered && !hasClaimRequest && (
+                          {isHovered && (
                             <motion.div
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
@@ -825,17 +1193,35 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                                   e.stopPropagation();
                                   handleClaimItem(item.id, itemType);
                                 }}
-                                className="flex-1 py-2.5 rounded-lg text-xs font-bold font-[Aldrich] uppercase transition-all pointer-events-auto shadow-lg"
+                                disabled={processingId === item.id}
+                                className="flex-1 py-2.5 rounded-lg text-xs font-bold font-[Aldrich] uppercase transition-all pointer-events-auto shadow-lg flex items-center justify-center gap-1.5"
                                 style={{
-                                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
+                                  background: processingId === item.id
+                                    ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(75, 85, 99, 0.4) 100%)'
+                                    : 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
                                   backdropFilter: 'blur(10px)',
                                   WebkitBackdropFilter: 'blur(10px)',
-                                  border: '1px solid rgba(16, 185, 129, 0.6)',
-                                  color: '#10b981',
+                                  border: processingId === item.id
+                                    ? '1px solid rgba(107, 114, 128, 0.6)'
+                                    : '1px solid rgba(16, 185, 129, 0.6)',
+                                  color: processingId === item.id ? '#9ca3af' : '#10b981',
                                   boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
+                                  cursor: processingId === item.id ? 'not-allowed' : 'pointer',
+                                  opacity: processingId === item.id ? 0.7 : 1,
                                 }}
                               >
-                                ПОЛУЧИТЬ
+                                {processingId === item.id ? (
+                                  <>
+                                    <motion.div
+                                      animate={{ rotate: 360 }}
+                                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                      className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full"
+                                    />
+                                    <span className="text-[10px]">ОБРАБОТКА...</span>
+                                  </>
+                                ) : (
+                                  'ПОЛУЧИТЬ'
+                                )}
                               </motion.button>
 
                               {/* Red Coin Icon Button - Only for non-money items */}
@@ -864,6 +1250,25 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                             </motion.div>
                           )}
                         </AnimatePresence>
+                        
+                        {/* 🔥 GLOBAL PROCESSING OVERLAY - перекрывает ВСЮ карточку */}
+                        {processingId === item.id && (
+                          <div
+                            className="absolute inset-0 flex items-center justify-center z-50 pointer-events-none"
+                            style={{
+                              background: 'rgba(0, 0, 0, 0.75)',
+                              backdropFilter: 'blur(6px)',
+                              WebkitBackdropFilter: 'blur(6px)',
+                              borderRadius: '8px',
+                            }}
+                          >
+                            <div className="text-center">
+                              <Loader2 className="w-10 h-10 animate-spin mx-auto mb-2" style={{ color: '#10b981' }} />
+                              <p className="text-white font-bold text-sm uppercase tracking-wider">PROCESSING</p>
+                              <p className="text-[10px] text-gray-300 mt-1">Please wait...</p>
+                            </div>
+                          </div>
+                        )}
                       </motion.div>
                     );
                   })}
@@ -1168,6 +1573,19 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                       request={request}
                       onUpdate={(id, timeRemaining) => {
                         setClaimRequests(prev => prev.map(req => req.id === id ? { ...req, timeRemaining } : req));
+                      }}
+                      onTimeout={(id) => {
+                        // 🔥 Таймер истёк - автоматическая отмена заявки
+                        console.log(`⏱ [PlayerProfile] Request ${id} timed out, cancelling...`);
+                        handleRemoveRequest(id);
+                        clearProcessingId();
+                        toast.error(
+                          <div className="flex items-center gap-3">
+                            <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
+                            <span>Request cancelled: Admin did not respond in 60 minutes</span>
+                          </div>,
+                          { duration: 6000 }
+                        );
                       }}
                     />
                     

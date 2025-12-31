@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Circle, Diamond, Star, Crown, Flame } from 'lucide-react';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { useWebSocket } from '../contexts/WebSocketContext'; // ✅ Добавлен WebSocket
 
 interface LiveDrop {
   id: string;
@@ -67,6 +68,7 @@ const getRarityIcon = (rarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythi
 export function LiveFeed() {
   const [drops, setDrops] = useState<LiveDrop[]>([]);
   const [hoveredDrop, setHoveredDrop] = useState<string | null>(null);
+  const { socket } = useWebSocket(); // ✅ Используем WebSocket
 
   // Fetch live drops every 3-5 seconds
   useEffect(() => {
@@ -104,6 +106,21 @@ export function LiveFeed() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // ✅ Обработка сообщений от WebSocket
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleNewDrop = (drop: LiveDrop) => {
+      setDrops((prevDrops) => [drop, ...prevDrops]);
+    };
+
+    socket.on('new_drop', handleNewDrop);
+
+    return () => {
+      socket.off('new_drop', handleNewDrop);
+    };
+  }, [socket]);
 
   return (
     <div className="w-full overflow-hidden bg-[#1d1f24] py-4">

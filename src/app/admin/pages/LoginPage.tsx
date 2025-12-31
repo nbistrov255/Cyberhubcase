@@ -4,9 +4,10 @@ import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 
 interface LoginPageProps {
   onLogin: (username: string, password: string) => void;
+  isLoggingIn?: boolean;
 }
 
-export function LoginPage({ onLogin }: LoginPageProps) {
+export function LoginPage({ onLogin, isLoggingIn = false }: LoginPageProps) {
   const { t } = useAdminLanguage();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -125,17 +126,23 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
             {/* Submit Button */}
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: isLoggingIn ? 1 : 1.02 }}
+              whileTap={{ scale: isLoggingIn ? 1 : 0.98 }}
               type="submit"
-              className="w-full py-3 rounded-lg font-bold font-[Aldrich] uppercase transition-all"
+              disabled={isLoggingIn}
+              className="w-full py-3 rounded-lg font-bold font-[Aldrich] uppercase transition-all flex items-center justify-center gap-2"
               style={{
-                background: '#7c2d3a',
+                background: isLoggingIn ? '#5a222c' : '#7c2d3a',
                 border: '1px solid #9a3b4a',
                 color: '#ffffff',
+                opacity: isLoggingIn ? 0.7 : 1,
+                cursor: isLoggingIn ? 'not-allowed' : 'pointer',
               }}
             >
-              {t('login.button')}
+              {isLoggingIn && (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              )}
+              {isLoggingIn ? 'Logging in...' : t('login.button')}
             </motion.button>
           </form>
         </div>

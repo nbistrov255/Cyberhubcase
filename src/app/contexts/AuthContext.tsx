@@ -100,11 +100,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Логин пользователя
    */
   const login = async (login: string, password: string): Promise<boolean> => {
+    console.log('🔐 [AuthContext] Login attempt:', { login });
     setIsLoading(true);
     setError(null);
 
     try {
       const requestBody: CreateSessionRequest = { login, password };
+      
+      console.log('📤 [AuthContext] Sending login request to:', API_ENDPOINTS.createSession);
       
       const response = await fetch(API_ENDPOINTS.createSession, {
         method: 'POST',
@@ -114,10 +117,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         body: JSON.stringify(requestBody),
       });
 
+      console.log('📥 [AuthContext] Login response status:', response.status);
+
       const data: CreateSessionResponse | ErrorResponse = await response.json();
+      console.log('📦 [AuthContext] Login response data:', data);
+      console.log('📦 [AuthContext] Login response data (JSON):', JSON.stringify(data, null, 2));
 
       if (!response.ok || !data.success) {
         const errorMsg = 'error' in data ? data.error : 'Login failed';
+        console.error('❌ [AuthContext] Login failed:', errorMsg);
         setError(errorMsg);
         return false;
       }
@@ -125,13 +133,64 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       // Успешная авторизация
       const sessionData = data as CreateSessionResponse;
       
+      console.log('✅ [AuthContext] Login successful!');
+      console.log('🔑 [AuthContext] Session token:', sessionData.session_token);
+      console.log('👤 [AuthContext] Profile (sessionData.profile):', sessionData.profile);
+      console.log('👤 [AuthContext] User (sessionData.user):', (sessionData as any).user);
+      console.log('👤 [AuthContext] Data object (sessionData.data):', (sessionData as any).data);
+      console.log('📋 [AuthContext] All keys in response:', Object.keys(sessionData));
+      
+      // ✅ ИСПРАВЛЕНИЕ: Сохраняем токен СРАЗУ
       setSessionToken(sessionData.session_token);
-      setProfile(sessionData.profile);
-      setIsAuthenticated(true);
+      
+      // ✅ ИСПРАВЛЕНИЕ: Пробуем разные варианты структуры профиля
+      const profile = sessionData.profile || (sessionData as any).user || (sessionData as any).data?.profile || (sessionData as any).data?.user;
+      
+      console.log('🎯 [AuthContext] Resolved profile:', profile);
+      
+      // ✅ НОВАЯ ЛОГИКА: Если профиль не пришел в ответе - загружаем отдельно
+      if (profile) {
+        setProfile(profile);
+        setIsAuthenticated(true);
+        console.log('💾 [AuthContext] State updated - isAuthenticated: true, profile:', profile);
+      } else {
+        console.log('⚠️ [AuthContext] Profile not in login response, fetching separately...');
+        
+        // Загружаем профиль отдельным запросом
+        try {
+          const profileResponse = await fetch(API_ENDPOINTS.getProfile, {
+            headers: getAuthHeaders(),
+          });
+
+          console.log('📥 [AuthContext] Profile fetch status:', profileResponse.status);
+
+          if (!profileResponse.ok) {
+            throw new Error('Failed to fetch profile');
+          }
+
+          const profileData: GetProfileResponse = await profileResponse.json();
+          console.log('📦 [AuthContext] Profile data:', profileData);
+
+          if (profileData.success && profileData.profile) {
+            setProfile(profileData.profile);
+            setIsAuthenticated(true);
+            console.log('✅ [AuthContext] Profile loaded successfully:', profileData.profile);
+          } else {
+            throw new Error('Invalid profile response');
+          }
+        } catch (profileErr) {
+          console.error('❌ [AuthContext] Failed to load profile:', profileErr);
+          // Откатываем авторизацию если не удалось загрузить профиль
+          clearSessionToken();
+          setError('Failed to load profile');
+          return false;
+        }
+      }
       
       return true;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Network error';
+      console.error('💥 [AuthContext] Login error:', err);
       setError(errorMsg);
       return false;
     } finally {

@@ -20,18 +20,16 @@ export default function App() {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 секунд таймаут
 
-        const response = await fetch('/api/profile', {
+        // ✅ ИСПРАВЛЕНО: Используем публичный endpoint для проверки здоровья
+        const response = await fetch('/api/stats/public', {
           method: 'GET',
-          headers: {
-            'Authorization': `Bearer test-token`,
-          },
           signal: controller.signal,
         });
 
         clearTimeout(timeoutId);
 
-        // Если сервер ответил (даже с ошибкой авторизации), значит он работает
-        if (response.status === 401 || response.ok) {
+        // Если сервер ответил, значит он работает
+        if (response.ok) {
           setIsServerDown(false);
           setRetryCount(0);
         } else {
@@ -48,8 +46,8 @@ export default function App() {
       }
     };
 
-    // Первая проверка при загрузке
-    checkServerHealth();
+    // ✅ ИСПРАВЛЕНО: Задержка перед первой проверкой (даем приложению загрузиться)
+    const initialTimeout = setTimeout(checkServerHealth, 1000);
 
     // Периодическая проверка каждые 10 секунд
     const interval = setInterval(checkServerHealth, 10000);
@@ -61,6 +59,7 @@ export default function App() {
     }
 
     return () => {
+      clearTimeout(initialTimeout);
       clearInterval(interval);
       if (retryInterval) clearInterval(retryInterval);
     };

@@ -4,6 +4,14 @@ import { Server as SocketIOServer } from "socket.io"; // 🔥 WebSocket: Socket.
 import cors from "cors";
 import crypto from "crypto";
 import { initDB } from "./database";
+import { 
+  loginAdmin, 
+  validateAdminToken, 
+  logoutAdmin, 
+  ensureRootAdmin,
+  checkAdminPermission,
+  AdminRole
+} from './admin-auth';
 
 // --- КОНФИГУРАЦИЯ ---
 const PORT = 3000;
@@ -155,6 +163,55 @@ async function requireSession(req: express.Request, res: express.Response, next:
   next();
 }
 
+// 🔐 MIDDLEWARE ДЛЯ АДМИНСКОЙ АВТОРИЗАЦИИ
+async function requireAdminSession(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  const token = req.headers.authorization?.split(' ')[1];
+  
+  if (!token) {
+    console.log('❌ [AdminAuth] No token provided');
+    return res.status(401).json({ error: 'No admin token' });
+  }
+  
+  if (!db) {
+    return res.status(500).json({ error: 'DB not ready' });
+  }
+  
+  const session = await validateAdminToken(db, token);
+  
+  if (!session) {
+    console.log('❌ [AdminAuth] Invalid or expired token');
+    return res.status(401).json({ error: 'Invalid admin session' });
+  }
+  
+  console.log(`✅ [AdminAuth] Valid session for: ${session.username} (${session.role})`);
+  
+  // Сохраняем данные админа в res.locals
+  res.locals.adminSession = session;
+  next();
+}
+
+// 🔐 MIDDLEWARE ДЛЯ ПРОВЕРКИ ПРАВ ДОСТУПА
+function requireAdminRole(requiredRole: AdminRole) {
+  return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const session = res.locals.adminSession;
+    
+    if (!session) {
+      return res.status(401).json({ error: 'Admin session required' });
+    }
+    
+    if (!checkAdminPermission(session.role, requiredRole)) {
+      console.log(`❌ [AdminAuth] Insufficient permissions: ${session.role} < ${requiredRole}`);
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    
+    next();
+  };
+}
+
 // 🔥 ФУНКЦИЯ ПОПОЛНЕНИЯ БОНУСОВ через SmartShell setBonus
 async function addClientDeposit(userUuid: string, amount: number): Promise<boolean> {
     console.log(`💰 [SmartShell] Adding ${amount}€ BONUS to ${userUuid}`);
@@ -278,7 +335,87 @@ app.get("/api/profile", requireSession, async (req, res) => {
   res.json({ success: true, profile: { uuid: user_uuid, nickname, balance, dailySum: progress.daily, monthlySum: progress.monthly, tradeLink: res.locals.session.trade_link, cases } });
 });
 
-app.get("/api/admin/items", requireSession, async (req, res) => {
+// ============================================================================
+// 🔐 ADMIN AUTHENTICATION ENDPOINTS
+// ============================================================================
+
+// POST /api/admin/login - Логин админа
+app.post('/api/admin/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Username and password required' 
+      });
+    }
+    
+    const result = await loginAdmin(db, username, password);
+    
+    if (!result) {
+      return res.status(401).json({ 
+        success: false, 
+        error: 'Invalid credentials' 
+      });
+    }
+    
+    const { token, admin } = result;
+    
+    res.json({
+      success: true,
+      session_token: token,
+      user_id: admin.id,
+      username: admin.username,
+      role: admin.role,
+      email: admin.email,
+    });
+  } catch (error) {
+    console.error('❌ Admin login error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Internal server error' 
+    });
+  }
+});
+
+// POST /api/admin/logout - Выход админа
+app.post('/api/admin/logout', requireAdminSession, async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token) {
+      await logoutAdmin(db, token);
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error('❌ Admin logout error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// GET /api/admin/me - Получить данные текущего админа
+app.get('/api/admin/me', requireAdminSession, async (req, res) => {
+  try {
+    const session = res.locals.adminSession;
+    res.json({
+      success: true,
+      admin: {
+        id: session.admin_id,
+        username: session.username,
+        role: session.role,
+      }
+    });
+  } catch (error) {
+    console.error('❌ Admin me error:', error);
+    res.status(500).json({ success: false, error: 'Internal server error' });
+  }
+});
+
+// ============================================================================
+// 🔐 ADMIN ITEMS ENDPOINTS (Protected)
+// ============================================================================
+
+app.get("/api/admin/items", requireAdminSession, async (req, res) => {
     const items = await db.all("SELECT * FROM items ORDER BY title ASC");
     res.json({ success: true, items });
 });
@@ -352,7 +489,7 @@ app.delete("/api/admin/cases/:id", async (req, res) => {
     } catch (e: any) { res.status(500).json({ error: e.message }); }
 });
 
-app.get("/api/admin/cases", requireSession, async (req, res) => {
+app.get("/api/admin/cases", requireAdminSession, async (req, res) => {
   const cases = await db.all("SELECT * FROM cases");
   const result = [];
   for (const c of cases) {
@@ -587,6 +724,9 @@ app.post("/api/admin/requests/:id/return", requireSession, async (req, res) => {
 
 initDB().then(async database => { 
     db = database; 
+    
+    // 🔐 Инициализация root админа (создаётся автоматически если БД пустая)
+    await ensureRootAdmin(db);
     
     // 🔥 WebSocket: Создаем HTTP server и Socket.IO
     const server = http.createServer(app);

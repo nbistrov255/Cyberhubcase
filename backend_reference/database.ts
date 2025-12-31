@@ -137,5 +137,32 @@ export async function initDB() {
   try { await db.exec("ALTER TABLE items ADD COLUMN stock INTEGER DEFAULT -1;"); } catch (e) {}
   try { await db.exec("ALTER TABLE inventory ADD COLUMN status TEXT DEFAULT 'available';"); } catch (e) {}
 
+  // 🔐 Таблица админов
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_users (
+      id TEXT PRIMARY KEY,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL, -- 'owner', 'admin', 'moderator'
+      email TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at INTEGER,
+      last_login_at INTEGER
+    );
+  `)
+
+  // 🔐 Таблица админских сессий
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS admin_sessions (
+      token TEXT PRIMARY KEY,
+      admin_id TEXT,
+      username TEXT,
+      role TEXT,
+      created_at INTEGER,
+      expires_at INTEGER,
+      FOREIGN KEY(admin_id) REFERENCES admin_users(id) ON DELETE CASCADE
+    );
+  `)
+
   return db
 }

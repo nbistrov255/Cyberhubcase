@@ -59,6 +59,9 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    console.log('📝 [ItemFormModal] Form submitted');
+    console.log('📝 [ItemFormModal] Raw formData:', formData);
+    
     // Логика для Stock: если пустое, отправляем -1 (бесконечно)
     const stockValue = formData.stock === '' ? -1 : parseInt(formData.stock) || 0;
     
@@ -70,6 +73,8 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
       stock: stockValue,
       sell_price_eur: sellPriceValue,
     };
+    
+    console.log('📤 [ItemFormModal] Submission data:', submissionData);
     
     onSave(submissionData);
   };
@@ -127,7 +132,7 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
 
             {/* Scrollable Form Content */}
             <div className="overflow-y-auto" style={{ maxHeight: 'calc(85vh - 180px)' }}>
-              <form onSubmit={handleSubmit} className="p-6">
+              <form id="item-form" onSubmit={handleSubmit} className="p-6">
                 <div className="space-y-6">
                   {/* Type */}
                   <div>
@@ -351,7 +356,7 @@ export function ItemFormModal({ open, onClose, onSave, editingItem }: ItemFormMo
               </button>
               <motion.button
                 type="submit"
-                onClick={handleSubmit}
+                form="item-form"
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="px-6 py-2.5 rounded-lg font-bold uppercase transition-all"
