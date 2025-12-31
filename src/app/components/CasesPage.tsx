@@ -83,78 +83,88 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
   }, []);
 
   useEffect(() => {
-    // Если пользователь не авторизован, можно загрузить публичные кейсы (если бы API позволяло),
-    // но пока используем логику профиля. Если профиля нет, кейсы могут быть пустыми или дефолтными.
-    if (!profile || !profile.cases) {
-      console.log('⚠️ No profile or no cases in profile');
-      setLoading(false);
-      return;
-    }
-
-    // 📦 ОТЛАДКА: Показываем сырые данные с сервера
-    console.log('📦 Raw Cases from Profile:', profile.cases);
-
-    // ⚠️ ПРОВЕРКА: Если массив кейсов пустой
-    if (profile.cases.length === 0) {
-      console.warn('⚠️ Profile cases are empty array');
-      setLoading(false);
-      return;
-    }
-
-    // УЛУЧШЕННЫЙ МАППИНГ: Нормализация типа для защиты от опечаток
-    const mappedCases: CaseData[] = (profile.cases || []).map((apiCase: any) => {
-      // Нормализация типа: lowercase + trim для защиты от пробелов и регистра
-      const normalizedType = (apiCase.type || '').toLowerCase().trim();
-      
-      // Определяем tier на основе нормализованного типа (используем contains для гибкости)
-      let tier: string;
-      if (normalizedType.includes('daily')) {
-        tier = 'Common';
-      } else if (normalizedType.includes('monthly')) {
-        tier = 'Premium';
-      } else if (normalizedType.includes('event')) {
-        tier = 'Legendary';
-      } else {
-        // Fallback для неизвестных типов - показываем как Common, но логируем
-        console.warn(`⚠️ Unknown case type: "${apiCase.type}" (normalized: "${normalizedType}") for case ID: ${apiCase.id}`);
-        tier = 'Common';
+    const loadCases = () => {
+      // Если пользователь не авторизован, можно загрузить публичные кейсы (если бы API позволяло),
+      // но пока используем логику профиля. Если профиля нет, кейсы могут быть пустыми или дефолтными.
+      if (!profile || !profile.cases) {
+        console.log('⚠️ No profile or no cases in profile, retrying...');
+        setLoading(false);
+        return;
       }
 
-      return {
-        id: apiCase.id,
-        // Формируем имя с ценой используя поля title (или nameEn) и threshold
-        name: apiCase.title || apiCase.nameEn
-          ? `${apiCase.title || apiCase.nameEn} (${apiCase.threshold}€)` 
-          : (normalizedType.includes('daily')
-              ? `Daily Case (${apiCase.threshold}€)` 
-              : normalizedType.includes('monthly')
-                ? `Monthly Case (${apiCase.threshold}€)`
-                : `Event Case (${apiCase.threshold}€)`),
-        
-        // Используем поле image напрямую с fallback
-        image: apiCase.image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
-        tier: tier,
-        
-        // Статистика депозитов - используем правильные поля
-        deposited: apiCase.progress || 0,        // progress - депозит пользователя
-        required: apiCase.threshold || 0,        // threshold - требуемая сумма
-        
-        // Доступность
-        usedToday: apiCase.is_claimed || !apiCase.available,
-        
-        // УЛУЧШЕННАЯ ПРОВЕРКА: isEvent только если тип содержит 'event'
-        isEvent: normalizedType.includes('event'),
-        normalizedType: normalizedType, // Сохраняем нормализованный тип
-      };
-    });
+      // 📦 ОТЛАДКА: Показываем сырые данные с сервера
+      console.log('📦 Raw Cases from Profile:', profile.cases);
 
-    // 🏷️ ОТЛАДКА: Показываем обработанные данные
-    console.log('🏷️ Mapped Cases:', mappedCases);
-    console.log(`📊 Total cases mapped: ${mappedCases.length}`);
-    
-    setCases(mappedCases);
-    setLoading(false);
-  }, [profile, isAuthenticated]);
+      // ⚠️ ПРОВЕРКА: Если массив кейсов пустой
+      if (profile.cases.length === 0) {
+        console.warn('⚠️ Profile cases are empty array');
+        setLoading(false);
+        return;
+      }
+
+      // УЛУЧШЕННЫЙ МАППИНГ: Нормализация типа для защиты от опечаток
+      const mappedCases: CaseData[] = (profile.cases || []).map((apiCase: any) => {
+        // Нормализация типа: lowercase + trim для защиты от пробелов и регистра
+        const normalizedType = (apiCase.type || '').toLowerCase().trim();
+        
+        // Определяем tier на основе нормализованного типа (используем contains для гибкости)
+        let tier: string;
+        if (normalizedType.includes('daily')) {
+          tier = 'Common';
+        } else if (normalizedType.includes('monthly')) {
+          tier = 'Premium';
+        } else if (normalizedType.includes('event')) {
+          tier = 'Legendary';
+        } else {
+          // Fallback для неизвестных типов - показываем как Common, но логируем
+          console.warn(`⚠️ Unknown case type: "${apiCase.type}" (normalized: "${normalizedType}") for case ID: ${apiCase.id}`);
+          tier = 'Common';
+        }
+
+        return {
+          id: apiCase.id,
+          // Формируем имя с ценой используя поля title (или nameEn) и threshold
+          name: apiCase.title || apiCase.nameEn
+            ? `${apiCase.title || apiCase.nameEn} (${apiCase.threshold}€)` 
+            : (normalizedType.includes('daily')
+                ? `Daily Case (${apiCase.threshold}€)` 
+                : normalizedType.includes('monthly')
+                  ? `Monthly Case (${apiCase.threshold}€)`
+                  : `Event Case (${apiCase.threshold}€)`),
+          
+          // Используем поле image напрямую с fallback
+          image: apiCase.image || 'https://i.ibb.co/bRChPPVb/boxcard.png',
+          tier: tier,
+          
+          // Статистика депозитов - используем правильные поля
+          deposited: apiCase.progress || 0,        // progress - депозит пользователя
+          required: apiCase.threshold || 0,        // threshold - требуемая сумма
+          
+          // Доступность
+          usedToday: apiCase.is_claimed || !apiCase.available,
+          
+          // УЛУЧШЕННАЯ ПРОВЕРКА: isEvent только если тип содержит 'event'
+          isEvent: normalizedType.includes('event'),
+          normalizedType: normalizedType, // Сохраняем нормализованный тип
+        };
+      });
+
+      // 🏷️ ОТЛАДКА: Показываем обработанные данные
+      console.log('🏷️ Mapped Cases:', mappedCases);
+      console.log(`📊 Total cases mapped: ${mappedCases.length}`);
+      
+      setCases(mappedCases);
+      setLoading(false);
+    };
+
+    // ✅ ИСПРАВЛЕНИЕ: Задержка для гарантии загрузки профиля
+    if (profile === null && loading) {
+      const timer = setTimeout(loadCases, 500);
+      return () => clearTimeout(timer);
+    } else {
+      loadCases();
+    }
+  }, [profile, isAuthenticated]); // ✅ Добавлен триггер на изменение авторизации
 
   // Разделение кейсов
   const eventCases = cases.filter(c => c.isEvent);

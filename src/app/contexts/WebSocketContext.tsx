@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { useAuth } from './AuthContext';
 
 // Backend URL (без /api, так как WebSocket работает отдельно)
 const SOCKET_URL = 'http://91.107.120.48:3000';
@@ -16,7 +15,23 @@ interface WebSocketContextType {
 const WebSocketContext = createContext<WebSocketContextType | undefined>(undefined);
 
 export function WebSocketProvider({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, profile } = useAuth();
+  // ✅ ИСПРАВЛЕНО: Опциональное использование AuthContext (может не быть в админке)
+  let isAuthenticated = false;
+  let profileId: string | undefined = undefined;
+
+  try {
+    // Пытаемся импортировать AuthContext только если он доступен
+    const AuthContext = require('./AuthContext');
+    if (AuthContext && AuthContext.useAuth) {
+      const auth = AuthContext.useAuth();
+      isAuthenticated = auth.isAuthenticated;
+      profileId = auth.profile?.id;
+    }
+  } catch (error) {
+    // AuthContext недоступен (например, в админке) - это нормально
+    console.log('📡 WebSocket: AuthContext not available (admin mode?)');
+  }
+
   const [isConnected, setIsConnected] = useState(false);
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
   const socketRef = useRef<Socket | null>(null);
@@ -43,8 +58,8 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       setIsConnected(true);
       
       // Если пользователь авторизован, отправляем его ID
-      if (isAuthenticated && profile?.id) {
-        socket.emit('user:identify', { userId: profile.id });
+      if (isAuthenticated && profileId) {
+        socket.emit('user:identify', { userId: profileId });
       }
     });
 
@@ -81,7 +96,7 @@ export function WebSocketProvider({ children }: { children: React.ReactNode }) {
       socket.disconnect();
       socketRef.current = null;
     };
-  }, [isAuthenticated, profile?.id]);
+  }, [isAuthenticated, profileId]);
 
   // Методы для подписки/отписки от событий
   const on = useCallback((event: string, callback: (...args: any[]) => void) => {

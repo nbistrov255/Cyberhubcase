@@ -10,6 +10,8 @@ import { UsersPage } from './pages/UsersPage';
 import { LogsPage } from './pages/LogsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AdminLanguageProvider } from './contexts/AdminLanguageContext';
+// ✅ ДОБАВЛЕН ИМПОРТ WebSocketProvider
+import { WebSocketProvider } from '../contexts/WebSocketContext';
 
 export type AdminPage = 
   | 'login'
@@ -56,28 +58,30 @@ export default function AdminApp() {
   };
 
   return (
-    <AdminLanguageProvider>
-      {(currentPage === 'login' || !currentUser) ? (
-        <LoginPage onLogin={handleLogin} />
-      ) : (
-        <AdminLayout
-          currentPage={currentPage}
-          onNavigate={setCurrentPage}
-          currentUser={currentUser}
-          onLogout={handleLogout}
-          language={adminLanguage}
-          onLanguageChange={setAdminLanguage}
-        >
-          {currentPage === 'dashboard' && <DashboardPage onNavigate={setCurrentPage} />}
-          {currentPage === 'items' && <ItemsPage userRole={currentUser.role} />}
-          {currentPage === 'cases' && <CasesPage userRole={currentUser.role} />}
-          {currentPage === 'requests' && <RequestsPage userRole={currentUser.role} />}
-          {currentPage === 'problem-queue' && <ProblemQueuePage userRole={currentUser.role} />}
-          {currentPage === 'users' && <UsersPage userRole={currentUser.role} />}
-          {currentPage === 'logs' && <LogsPage userRole={currentUser.role} />}
-          {currentPage === 'settings' && <SettingsPage userRole={currentUser.role} />}
-        </AdminLayout>
-      )}
-    </AdminLanguageProvider>
+    <WebSocketProvider>
+      <AdminLanguageProvider>
+        {(currentPage === 'login' || !currentUser) ? (
+          <LoginPage onLogin={handleLogin} />
+        ) : (
+          <AdminLayout
+            currentPage={currentPage}
+            onNavigate={setCurrentPage}
+            currentUser={currentUser}
+            onLogout={handleLogout}
+            language={adminLanguage}
+            onLanguageChange={setAdminLanguage}
+          >
+            {currentPage === 'dashboard' && <DashboardPage onNavigate={setCurrentPage} />}
+            {currentPage === 'items' && <ItemsPage userRole={currentUser.role} />}
+            {currentPage === 'cases' && <CasesPage userRole={currentUser.role} />}
+            {currentPage === 'requests' && <RequestsPage userRole={currentUser.role} />}
+            {currentPage === 'problem-queue' && <ProblemQueuePage userRole={currentUser.role} />}
+            {currentPage === 'users' && <UsersPage userRole={currentUser.role} />}
+            {currentPage === 'logs' && <LogsPage userRole={currentUser.role} />}
+            {currentPage === 'settings' && <SettingsPage userRole={currentUser.role} />}
+          </AdminLayout>
+        )}
+      </AdminLanguageProvider>
+    </WebSocketProvider>
   );
 }
