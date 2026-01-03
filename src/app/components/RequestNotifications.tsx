@@ -4,6 +4,7 @@ import { X, Minimize2, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-
 
 export interface ClaimRequest {
   id: string;
+  requestId: string; // Номер заявки для отображения
   itemName: string;
   itemImage: string;
   itemRarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
@@ -11,7 +12,8 @@ export interface ClaimRequest {
   caseName: string;
   status: 'pending' | 'approved' | 'denied';
   tradeLink?: string;
-  comment?: string;
+  comment?: string; // Комментарий игрока
+  adminComment?: string; // 🔥 Причина отклонения от админа
   createdAt: Date;
   timeRemaining: number; // в секундах
 }
@@ -31,13 +33,26 @@ export function RequestNotifications({
 }: RequestNotificationsProps) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [visibleRequests, setVisibleRequests] = useState<ClaimRequest[]>([]);
+  const [showAllRequests, setShowAllRequests] = useState(false); // 🔥 НОВОЕ: показать все заявки
 
-  // Показываем только первые 3 + остальные
+  // Показываем только первые 3 + остальные (или все если showAllRequests = true)
   useEffect(() => {
-    setVisibleRequests(requests.slice(0, 3));
-  }, [requests]);
+    console.log(`📋 [RequestNotifications] Received ${requests.length} requests:`, requests);
+    if (showAllRequests) {
+      setVisibleRequests(requests);
+    } else {
+      setVisibleRequests(requests.slice(0, 3));
+    }
+  }, [requests, showAllRequests]);
+  
+  // 🔥 Сбрасываем showAllRequests когда открывается drawer
+  useEffect(() => {
+    if (expandedId) {
+      setShowAllRequests(false);
+    }
+  }, [expandedId]);
 
-  const hiddenCount = requests.length - visibleRequests.length;
+  const hiddenCount = showAllRequests ? 0 : requests.length - visibleRequests.length;
 
   return (
     <>
@@ -52,7 +67,11 @@ export function RequestNotifications({
                 {!isExpanded && (
                   <FloatingCircle
                     request={request}
-                    onClick={() => setExpandedId(request.id)}
+                    onClick={() => {
+                      console.log(`🖱️ [FloatingCircle] Clicked on request:`, request);
+                      console.log(`🖱️ [FloatingCircle] Setting expandedId to:`, request.id);
+                      setExpandedId(request.id);
+                    }}
                     onClose={onClose}
                     onUpdateTime={onUpdateTime}
                     index={index}
@@ -70,7 +89,10 @@ export function RequestNotifications({
             initial={{ scale: 0, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0, opacity: 0 }}
-            className="w-20 h-20 rounded-full flex items-center justify-center cursor-pointer"
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowAllRequests(true)}
+            className="w-20 h-20 rounded-full flex items-center justify-center cursor-pointer transition-all"
             style={{
               background: 'linear-gradient(135deg, #7c2d3a 0%, #5a1f2a 100%)',
               border: '2px solid rgba(255, 255, 255, 0.1)',
@@ -80,24 +102,52 @@ export function RequestNotifications({
             <span className="text-white font-bold text-sm">+{hiddenCount}</span>
           </motion.div>
         )}
+        
+        {/* Collapse Badge - показывается когда раскрыты все заявки */}
+        {showAllRequests && requests.length > 3 && !expandedId && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowAllRequests(false)}
+            className="w-20 h-20 rounded-full flex items-center justify-center cursor-pointer transition-all"
+            style={{
+              background: 'linear-gradient(135deg, #5a1f2a 0%, #7c2d3a 100%)',
+              border: '2px solid rgba(255, 255, 255, 0.2)',
+              boxShadow: '0 8px 24px rgba(124, 45, 58, 0.5)',
+            }}
+          >
+            <span className="text-white font-bold text-xs">Collapse</span>
+          </motion.div>
+        )}
       </div>
 
       {/* Expanded Drawer Panel */}
       <AnimatePresence>
-        {expandedId && (
+        {expandedId && requests.find(r => r.id === expandedId) && (() => {
+          const foundRequest = requests.find(r => r.id === expandedId)!;
+          console.log(`📂 [RequestDrawer] Opening drawer for expandedId:`, expandedId);
+          console.log(`📂 [RequestDrawer] Found request:`, foundRequest);
+          console.log(`📂 [RequestDrawer] All requests:`, requests);
+          return (
           <RequestDrawer
-            request={requests.find(r => r.id === expandedId)!}
-            onClose={() => {
-              const request = requests.find(r => r.id === expandedId);
-              if (request && request.status !== 'pending') {
-                onClose(request.id); // 🔥 ИСПРАВЛЕНО: закрываем конкретный request
-              }
+            key={expandedId} // 🔥 ВАЖНО: key для перерендера при изменении request
+            request={foundRequest}
+            onClose={(requestId: string) => {
+              // 🔥 ИСПРАВЛЕНО: сначала сворачиваем, потом удаляем
+              setExpandedId(null);
+              setTimeout(() => {
+                onClose(requestId);
+              }, 100); // Небольшая задержка чтобы анимация свертывания прошла
             }}
             onMinimize={() => setExpandedId(null)}
             onUpdateTime={onUpdateTime}
             requestTimeoutMinutes={requestTimeoutMinutes}
           />
-        )}
+          );
+        })()}
       </AnimatePresence>
     </>
   );
@@ -118,6 +168,12 @@ interface FloatingCircleProps {
 
 function FloatingCircle({ request, onClick, onClose, onUpdateTime, index, requestTimeoutMinutes }: FloatingCircleProps) {
   const [timeRemaining, setTimeRemaining] = useState(request.timeRemaining);
+
+  // 🔥 СИНХРОНИЗАЦИЯ: обновляем timeRemaining когда request меняется
+  useEffect(() => {
+    setTimeRemaining(request.timeRemaining);
+    console.log(`🔄 [FloatingCircle] Request updated:`, request);
+  }, [request]);
 
   // Countdown timer
   useEffect(() => {
@@ -146,6 +202,8 @@ function FloatingCircle({ request, onClick, onClose, onUpdateTime, index, reques
   const statusColor = getStatusColor();
   const progress = request.status === 'pending' ? (timeRemaining / (requestTimeoutMinutes * 60)) * 100 : 100;
   const canClose = request.status !== 'pending';
+  
+  console.log(`🔍 [FloatingCircle] Request ${request.id}: status=${request.status}, canClose=${canClose}`);
 
   return (
     <motion.div
@@ -265,7 +323,7 @@ function FloatingCircle({ request, onClick, onClose, onUpdateTime, index, reques
 
 interface RequestDrawerProps {
   request: ClaimRequest;
-  onClose: () => void;
+  onClose: (requestId: string) => void; // 🔥 Изменили сигнатуру
   onMinimize: () => void;
   onUpdateTime: (id: string, timeRemaining: number) => void;
   requestTimeoutMinutes: number;
@@ -273,6 +331,12 @@ interface RequestDrawerProps {
 
 function RequestDrawer({ request, onClose, onMinimize, onUpdateTime, requestTimeoutMinutes }: RequestDrawerProps) {
   const [timeRemaining, setTimeRemaining] = useState(request.timeRemaining);
+
+  // 🔥 СИНХРОНИЗАЦИЯ: обновляем timeRemaining когда request меняется
+  useEffect(() => {
+    setTimeRemaining(request.timeRemaining);
+    console.log(`🔄 [RequestDrawer] Request updated:`, request);
+  }, [request]);
 
   // Countdown timer
   useEffect(() => {
@@ -301,6 +365,8 @@ function RequestDrawer({ request, onClose, onMinimize, onUpdateTime, requestTime
   const statusColor = getStatusColor();
   const progress = request.status === 'pending' ? (timeRemaining / (requestTimeoutMinutes * 60)) * 100 : 100;
   const canClose = request.status !== 'pending';
+  
+  console.log(`🔍 [RequestDrawer] Request ${request.id}: status=${request.status}, canClose=${canClose}`);
 
   const rarityColors = {
     common: '#9ca3af',
@@ -367,7 +433,7 @@ function RequestDrawer({ request, onClose, onMinimize, onUpdateTime, requestTime
           </button>
           {canClose && (
             <button
-              onClick={onClose}
+              onClick={() => onClose(request.id)}
               className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/10 transition-colors"
             >
               <X className="w-4 h-4 text-gray-400" />
@@ -421,25 +487,35 @@ function RequestDrawer({ request, onClose, onMinimize, onUpdateTime, requestTime
         <div className="h-px" style={{ background: `${statusColor}30` }} />
 
         {/* Details Grid */}
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div className="space-y-1">
-            <span className="text-gray-400 text-xs">Status:</span>
-            <div
-              className="px-3 py-1.5 rounded-lg font-bold uppercase text-xs text-center"
-              style={{
-                background: `${statusColor}20`,
-                color: statusColor,
-                border: `1px solid ${statusColor}40`,
-              }}
-            >
-              {request.status}
+        <div className="space-y-3">
+          {/* Request ID */}
+          <div>
+            <span className="text-gray-400 text-xs block mb-1">Request ID:</span>
+            <div className="px-3 py-2 rounded-lg bg-white/5 text-white font-mono text-sm border border-white/10">
+              {request.requestId}
             </div>
           </div>
 
-          <div className="space-y-1">
-            <span className="text-gray-400 text-xs">Type:</span>
-            <div className="px-3 py-1.5 rounded-lg bg-white/5 text-white capitalize text-xs text-center border border-white/10">
-              {request.itemType}
+          <div className="grid grid-cols-2 gap-3 text-sm">
+            <div className="space-y-1">
+              <span className="text-gray-400 text-xs">Status:</span>
+              <div
+                className="px-3 py-1.5 rounded-lg font-bold uppercase text-xs text-center"
+                style={{
+                  background: `${statusColor}20`,
+                  color: statusColor,
+                  border: `1px solid ${statusColor}40`,
+                }}
+              >
+                {request.status}
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <span className="text-gray-400 text-xs">Type:</span>
+              <div className="px-3 py-1.5 rounded-lg bg-white/5 text-white capitalize text-xs text-center border border-white/10">
+                {request.itemType}
+              </div>
             </div>
           </div>
         </div>
@@ -465,6 +541,31 @@ function RequestDrawer({ request, onClose, onMinimize, onUpdateTime, requestTime
                 transition={{ duration: 0.5 }}
               />
             </div>
+          </div>
+        )}
+
+        {/* 🔥 User Info Block - Trade Link or Comment */}
+        {(request.tradeLink || request.comment) && (
+          <div className="p-3 rounded-lg bg-white/5 border border-white/10">
+            {request.tradeLink && (
+              <div>
+                <span className="text-gray-400 text-xs block mb-1">Trade Link:</span>
+                <a
+                  href={request.tradeLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 text-xs hover:underline break-all"
+                >
+                  {request.tradeLink}
+                </a>
+              </div>
+            )}
+            {request.comment && (
+              <div>
+                <span className="text-gray-400 text-xs block mb-1">Your Comment:</span>
+                <p className="text-white text-xs">{request.comment}</p>
+              </div>
+            )}
           </div>
         )}
 
@@ -527,12 +628,19 @@ function RequestDrawer({ request, onClose, onMinimize, onUpdateTime, requestTime
           {request.status === 'denied' && (
             <div className="flex items-start gap-3">
               <XCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: statusColor }} />
-              <div>
+              <div className="flex-1">
                 <p className="font-bold text-white mb-1">Request Denied</p>
-                <p className="text-gray-400 text-xs mb-2">
-                  {request.comment || 'Your request has been denied. Item returned to inventory.'}
-                </p>
-                <p className="text-gray-500 text-xs">
+                
+                {/* 🔥 Причина отклонения от админа */}
+                {request.adminComment && (
+                  <div className="mb-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20">
+                    <p className="text-xs text-gray-400 mb-1">Reason:</p>
+                    <p className="text-sm text-white">{request.adminComment}</p>
+                  </div>
+                )}
+                
+                <p className="text-gray-400 text-xs">
+                  {!request.adminComment && 'Your request has been denied. '}
                   The item has been returned to your inventory.
                 </p>
               </div>
@@ -543,7 +651,7 @@ function RequestDrawer({ request, onClose, onMinimize, onUpdateTime, requestTime
         {/* Close Button (for approved/denied) */}
         {canClose && (
           <button
-            onClick={onClose}
+            onClick={() => onClose(request.id)}
             className="w-full py-3 rounded-lg font-bold text-white hover:opacity-80 transition-opacity"
             style={{
               background: `linear-gradient(135deg, ${statusColor} 0%, ${statusColor}dd 100%)`,

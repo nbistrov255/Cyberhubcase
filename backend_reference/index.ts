@@ -700,12 +700,12 @@ app.post("/api/user/tradelink", requireSession, async (req, res) => {
     res.json({ success: true });
 });
 
-// 🔥 НОВОЕ: GET /api/user/requests - Получить активные заявки пользователя
+// 🔥 НОВОЕ: GET /api/user/requests - Получить активные заявки (исключая dismissed)
 app.get("/api/user/requests", requireSession, async (req, res) => {
     try {
         const user_uuid = res.locals.session.user_uuid;
         
-        // Получаем только активные заявки (pending)
+        // 🔥 НОВОЕ: Получаем только НЕзакрытые заявки
         const requests = await db.all(`
             SELECT 
                 r.id as requestId,
@@ -715,17 +715,57 @@ app.get("/api/user/requests", requireSession, async (req, res) => {
                 r.created_at,
                 r.updated_at,
                 r.admin_comment,
-                inv.rarity as itemRarity
+                r.type as itemType,
+                inv.rarity as itemRarity,
+                inv.image_url as itemImage,
+                sp.case_id,
+                c.title as caseName
             FROM requests r
             LEFT JOIN inventory inv ON r.inventory_id = inv.id
-            WHERE r.user_uuid = ? AND r.status IN ('pending', 'approved', 'denied')
+            LEFT JOIN spins sp ON sp.user_uuid = r.user_uuid AND sp.prize_title = r.item_title
+            LEFT JOIN cases c ON sp.case_id = c.id
+            LEFT JOIN dismissed_notifications dn ON dn.request_id = r.id AND dn.user_uuid = r.user_uuid
+            WHERE r.user_uuid = ? 
+                AND r.status IN ('pending', 'approved', 'denied')
+                AND dn.id IS NULL
             ORDER BY r.created_at DESC
         `, user_uuid);
         
-        console.log(`📋 [User Requests] Found ${requests.length} requests for user ${user_uuid}`);
+        console.log(`📋 [User Requests] Found ${requests.length} active requests for user ${user_uuid}`);
         res.json({ success: true, requests });
     } catch (e: any) {
         console.error("❌ [User Requests] Error:", e);
+        res.status(500).json({ success: false, error: e.message });
+    }
+});
+
+// 🔥 НОВОЕ: POST /api/user/requests/:requestId/dismiss - Закрыть уведомление (больше не показывать)
+app.post("/api/user/requests/:requestId/dismiss", requireSession, async (req, res) => {
+    try {
+        const user_uuid = res.locals.session.user_uuid;
+        const requestId = req.params.requestId;
+        
+        // Проверяем что request принадлежит пользователю
+        const request = await db.get(`
+            SELECT id FROM requests 
+            WHERE id = ? AND user_uuid = ?
+        `, requestId, user_uuid);
+        
+        if (!request) {
+            return res.status(404).json({ success: false, error: "Request not found" });
+        }
+        
+        // Сохраняем dismissal
+        await db.run(`
+            INSERT INTO dismissed_notifications (user_uuid, request_id, dismissed_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT(user_uuid, request_id) DO UPDATE SET dismissed_at = excluded.dismissed_at
+        `, user_uuid, requestId, Date.now());
+        
+        console.log(`🗑️ [Dismiss] User ${user_uuid} dismissed request ${requestId}`);
+        res.json({ success: true });
+    } catch (e: any) {
+        console.error("❌ [Dismiss] Error:", e);
         res.status(500).json({ success: false, error: e.message });
     }
 });

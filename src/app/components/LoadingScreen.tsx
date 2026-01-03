@@ -23,38 +23,13 @@ export function LoadingScreen() {
       duration: Math.random() * 3 + 2,
       delay: Math.random() * 2,
       angle: (360 / 20) * i,
-      distance: Math.random() * 100 + 150,
+      distance: Math.random() * 80 + 100,
     }))
   );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#17171c] overflow-hidden">
-      {/* Subtle Background Pattern */}
-      <div 
-        className="absolute inset-0 opacity-5"
-        style={{
-          backgroundImage: `radial-gradient(circle at 2px 2px, rgba(124, 45, 58, 0.3) 1px, transparent 0)`,
-          backgroundSize: '40px 40px',
-        }}
-      />
-
-      {/* Radial Glow Background */}
-      <motion.div
-        className="absolute inset-0"
-        style={{
-          background: 'radial-gradient(circle at center, rgba(124, 45, 58, 0.15) 0%, transparent 50%)',
-        }}
-        animate={{
-          opacity: [0.3, 0.6, 0.3],
-        }}
-        transition={{
-          duration: 3,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        }}
-      />
-
-      {/* Flying Particles */}
+      {/* 🔥 ТОЛЬКО ИСКРЫ - никаких фоновых эффектов */}
       {particles.map((particle) => (
         <motion.div
           key={particle.id}
@@ -94,60 +69,6 @@ export function LoadingScreen() {
       <div className="relative z-10 flex flex-col items-center">
         {/* Logo with Spinning Ring */}
         <div className="relative">
-          {/* Outer Glow Rings */}
-          <motion.div
-            className="absolute inset-0"
-            style={{
-              transform: 'translate(-50%, -50%) scale(1.5)',
-              left: '50%',
-              top: '50%',
-            }}
-            animate={{
-              opacity: [0.2, 0.5, 0.2],
-              scale: [1.4, 1.6, 1.4],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
-          >
-            <div 
-              className="w-64 h-64 rounded-full"
-              style={{
-                border: '1px solid rgba(124, 45, 58, 0.3)',
-                boxShadow: '0 0 40px rgba(124, 45, 58, 0.4)',
-              }}
-            />
-          </motion.div>
-
-          <motion.div
-            className="absolute inset-0"
-            style={{
-              transform: 'translate(-50%, -50%) scale(1.3)',
-              left: '50%',
-              top: '50%',
-            }}
-            animate={{
-              opacity: [0.3, 0.6, 0.3],
-              scale: [1.2, 1.4, 1.2],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: 'easeInOut',
-              delay: 0.5,
-            }}
-          >
-            <div 
-              className="w-64 h-64 rounded-full"
-              style={{
-                border: '1px solid rgba(124, 45, 58, 0.4)',
-                boxShadow: '0 0 30px rgba(124, 45, 58, 0.5)',
-              }}
-            />
-          </motion.div>
-
           {/* Spinning Ring Container */}
           <div className="relative w-64 h-64 flex items-center justify-center">
             {/* Continuously Spinning Ring */}
@@ -178,7 +99,7 @@ export function LoadingScreen() {
                 strokeWidth="4"
                 strokeLinecap="round"
                 strokeDasharray={2 * Math.PI * 120}
-                strokeDashoffset={2 * Math.PI * 120 * 0.75} // 75% пустоты, 25% линия
+                strokeDashoffset={2 * Math.PI * 120 * 0.5}
                 style={{
                   filter: 'url(#glowFilter)',
                 }}
@@ -193,84 +114,30 @@ export function LoadingScreen() {
               />
             </svg>
 
-            {/* Logo in Center */}
+            {/* Logo in Center - УМЕНЬШЕН + ПУЛЬСАЦИЯ */}
             <motion.div
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ 
                 opacity: 1, 
-                scale: 1,
+                scale: [1, 1.05, 1], // 🔥 Слабая пульсация
               }}
-              transition={{ duration: 0.5 }}
-              className="relative z-10"
-            >
-              {/* Pulsing Glow Behind Logo */}
-              <motion.div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: 'radial-gradient(circle, rgba(124, 45, 58, 0.6) 0%, transparent 70%)',
-                  filter: 'blur(30px)',
-                }}
-                animate={{
-                  scale: [1, 1.3, 1],
-                  opacity: [0.5, 0.8, 0.5],
-                }}
-                transition={{
-                  duration: 2,
+              transition={{ 
+                opacity: { duration: 0.5 },
+                scale: {
+                  duration: 3,
                   repeat: Infinity,
                   ease: 'easeInOut',
-                }}
-              />
-
+                }
+              }}
+              className="relative z-10"
+            >
               <img 
                 src="https://i.ibb.co/23s1kJd7/Cyber-Hub-Logo-06.png" 
                 alt="CyberHub"
-                className="relative w-32 h-32 object-contain"
+                className="relative w-24 h-24 object-contain"
               />
             </motion.div>
           </div>
-
-          {/* Rotating Ring Accent */}
-          <motion.div
-            className="absolute inset-0"
-            style={{
-              transform: 'translate(-50%, -50%)',
-              left: '50%',
-              top: '50%',
-            }}
-            animate={{ rotate: 360 }}
-            transition={{
-              duration: 8,
-              repeat: Infinity,
-              ease: 'linear',
-            }}
-          >
-            <div className="w-64 h-64 relative">
-              {/* Small accent dots */}
-              {[0, 90, 180, 270].map((angle, i) => (
-                <motion.div
-                  key={i}
-                  className="absolute w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor: '#7c2d3a',
-                    boxShadow: '0 0 10px rgba(124, 45, 58, 0.8)',
-                    left: '50%',
-                    top: '50%',
-                    transform: `translate(-50%, -50%) rotate(${angle}deg) translateY(-122px)`,
-                  }}
-                  animate={{
-                    scale: [1, 1.5, 1],
-                    opacity: [0.5, 1, 0.5],
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                    delay: i * 0.2,
-                    ease: 'easeInOut',
-                  }}
-                />
-              ))}
-            </div>
-          </motion.div>
         </div>
 
         {/* Loading Text with Animated Dots */}

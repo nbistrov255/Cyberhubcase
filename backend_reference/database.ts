@@ -164,5 +164,22 @@ export async function initDB() {
     );
   `)
 
+  // 🔥 Таблица закрытых уведомлений (Dismissed Notifications)
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS dismissed_notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_uuid TEXT NOT NULL,
+      request_id TEXT NOT NULL,
+      dismissed_at INTEGER NOT NULL,
+      UNIQUE(user_uuid, request_id)
+    );
+  `)
+  
+  // Индекс для быстрого поиска dismissed notifications
+  await db.exec(`
+    CREATE INDEX IF NOT EXISTS idx_dismissed_user 
+    ON dismissed_notifications(user_uuid);
+  `)
+
   return db
 }

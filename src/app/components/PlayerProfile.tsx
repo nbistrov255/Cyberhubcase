@@ -16,14 +16,15 @@ interface PlayerProfileProps {
 
 interface ClaimRequest {
   id: string; // ✅ Изменён на string для совместимости с RequestNotifications
-  requestId: string;
+  requestId: string; // Номер заявки для отображения
   itemName: string;
   itemImage: string; // ✅ Добавлено
   itemRarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
   itemType: 'skin' | 'physical' | 'money'; // ✅ Добавлено
   caseName: string; // ✅ Добавлено
   tradeLink?: string; // ✅ Добавлено
-  comment?: string; // ✅ Добавлено
+  comment?: string; // Комментарий игрока
+  adminComment?: string; // 🔥 Причина отклонения от админа
   createdAt: Date;
   status: 'pending' | 'approved' | 'denied';
   timeRemaining: number; // seconds
@@ -80,6 +81,13 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
         console.log(`📦 [PlayerProfile] Restored processingId from localStorage: ${itemId}`);
         setProcessingId(itemId);
       }
+      
+      // 🔥 МИГРАЦИЯ: Очистка старого closedNotifications (теперь backend хранит dismissed)
+      const oldClosedNotifications = localStorage.getItem('closedNotifications');
+      if (oldClosedNotifications) {
+        localStorage.removeItem('closedNotifications');
+        console.log(`🧹 [PlayerProfile] Removed old closedNotifications from localStorage (migrated to backend)`);
+      }
     } catch (error) {
       console.error('Error loading processingId from localStorage:', error);
     }
@@ -111,27 +119,35 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
           }
           
           // Преобразуем backend requests в ClaimRequest формат
-          const activeRequests: ClaimRequest[] = data.requests.map((req: any) => ({
-            id: String(req.id), // ✅ Конвертируем в string
-            requestId: req.requestId || `REQ-${req.id}`, // REQ-XXXXXX
-            itemName: req.itemName || 'Unknown Item',
-            itemImage: req.itemImage || req.image_url || 'https://via.placeholder.com/200',
-            itemRarity: (req.itemRarity || 'common') as 'common' | 'rare' | 'epic' | 'legendary' | 'mythic',
-            itemType: (req.itemType || 'skin') as 'skin' | 'physical' | 'money',
-            caseName: req.caseName || 'Unknown Case',
-            tradeLink: req.tradeLink || undefined,
-            comment: req.comment || undefined,
-            createdAt: new Date(req.created_at || Date.now()), // 🔥 Реальное время создания
-            status: req.status as 'pending' | 'approved' | 'denied',
-            timeRemaining: Math.max(0, requestTimeoutMinutes * 60 - Math.floor((Date.now() - (req.created_at || Date.now())) / 1000)), // 🔥 Настраиваемый таймер
-          }));
+          const activeRequests: ClaimRequest[] = data.requests.map((req: any) => {
+            console.log('🔍 [PlayerProfile] Request data:', req); // 🔥 DEBUG
+            
+            // 🔥 НОВОЕ: Пытаемся найти item в текущем инвентаре для дополнительных данных
+            const inventoryItem = inventory.find(i => i.id === req.id);
+            
+            return {
+              id: String(req.id), // ✅ Конвертируем в string
+              requestId: req.requestId || `REQ-${req.id}`, // REQ-XXXXXX
+              itemName: req.itemName || req.item_name || inventoryItem?.title || inventoryItem?.name || 'Unknown Item',
+              itemImage: req.itemImage || req.image_url || req.item_image || inventoryItem?.image_url || inventoryItem?.image || 'https://via.placeholder.com/200?text=No+Image',
+              itemRarity: (req.itemRarity || req.item_rarity || inventoryItem?.rarity || 'common') as 'common' | 'rare' | 'epic' | 'legendary' | 'mythic',
+              itemType: (req.itemType || req.item_type || req.type || inventoryItem?.type || 'skin') as 'skin' | 'physical' | 'money',
+              caseName: req.caseName || req.case_name || 'Unknown Case',
+              tradeLink: req.tradeLink || req.trade_link || undefined,
+              comment: req.comment || req.user_comment || undefined, // 🔥 Комментарий игрока
+              adminComment: req.admin_comment || req.adminComment || undefined, // 🔥 Причина от админа
+              createdAt: new Date(req.created_at || Date.now()), // 🔥 Реальное время создания
+              status: req.status as 'pending' | 'approved' | 'denied',
+              timeRemaining: Math.max(0, requestTimeoutMinutes * 60 - Math.floor((Date.now() - (req.created_at || Date.now())) / 1000)), // 🔥 Настраиваемый таймер
+            };
+          });
           
-          // 🔥 НОВОЕ: Фильтруем закрытые уведомления
-          const closedNotifications = JSON.parse(localStorage.getItem('closedNotifications') || '[]');
-          const filteredRequests = activeRequests.filter(req => !closedNotifications.includes(req.id));
+          // 🔥 ОБНОВЛЕНО: Backend теперь сам фильтрует dismissed notifications
+          console.log(`✅ [PlayerProfile] Active requests loaded: ${activeRequests.length}`);
+          console.log('📋 [PlayerProfile] Active requests:', activeRequests);
           
-          setClaimRequests(filteredRequests);
-          console.log('✅ [PlayerProfile] Active requests loaded from backend');
+          setClaimRequests(activeRequests);
+          console.log('✅ [PlayerProfile] Active requests set to state');
         } else {
           console.log('📋 [PlayerProfile] No active requests found');
           setClaimRequests([]);
@@ -225,13 +241,21 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
       fetchActiveRequests(); // 🔥 Обновляем также requests
     };
     
-    // Подписываемся на событие для текущего пользователя
+    const handleRequestUpdate = () => {
+      console.log('🔔 [PlayerProfile] Request updated via WebSocket, refreshing...');
+      fetchActiveRequests();
+      fetchInventory(); // 🔥 Также обновляем инвентарь для статусов
+    };
+    
+    // Подписываемся на события для текущего пользователя
     on(`inventory:updated:${profile.uuid}`, handleInventoryUpdate);
-    console.log(`✅ [PlayerProfile] Subscribed to inventory:updated:${profile.uuid}`);
+    on(`request:updated:${profile.uuid}`, handleRequestUpdate);
+    console.log(`✅ [PlayerProfile] Subscribed to WebSocket events for ${profile.uuid}`);
     
     return () => {
       off(`inventory:updated:${profile.uuid}`, handleInventoryUpdate);
-      console.log(`❌ [PlayerProfile] Unsubscribed from inventory:updated:${profile.uuid}`);
+      off(`request:updated:${profile.uuid}`, handleRequestUpdate);
+      console.log(`❌ [PlayerProfile] Unsubscribed from WebSocket events`);
     };
   }, [profile?.uuid, on, off]);
 
@@ -268,10 +292,16 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
         if (!response.ok) return;
         
         const data = await response.json();
+        console.log('🔍 [Polling] Server response:', data);
+        
+        // 🔥 ИСПРАВЛЕНИЕ: data.requests - это массив
+        const serverRequests = data?.requests || data || [];
+        console.log('🔍 [Polling] Server requests:', serverRequests);
         
         // Проверяем статус каждой активной заявки
         claimRequests.forEach((localRequest) => {
-          const serverRequest = (data || []).find((r: any) => String(r.id) === localRequest.id);
+          const serverRequest = serverRequests.find((r: any) => String(r.id) === localRequest.id);
+          console.log(`🔍 [Polling] Checking request ${localRequest.id}: local status=${localRequest.status}, server status=${serverRequest?.status}`);
           
           if (serverRequest) {
             if (serverRequest.status === 'approved' && localRequest.status !== 'approved') {
@@ -559,7 +589,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
       toast.error(
         <div className="flex items-center gap-3">
           <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
-          <span>This item is already being processed. Please wait or refresh the page.</span>
+          <span>This item is already being processed. Please click the Refresh button in My Inventory.</span>
         </div>,
         { duration: 5000 }
       );
@@ -632,6 +662,16 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
           // Skins/Physical - показываем pop-up уведомление и перезагружаем requests с backend
           toast.success('Request sent to Admin!');
           
+          // 🔥 ВАЖНО: Удаляем itemId из closedNotifications чтобы новый request появился
+          try {
+            const closedNotifications = JSON.parse(localStorage.getItem('closedNotifications') || '[]');
+            const updatedClosed = closedNotifications.filter((id: string) => id !== String(itemId));
+            localStorage.setItem('closedNotifications', JSON.stringify(updatedClosed));
+            console.log(`🔓 [PlayerProfile] Removed item ${itemId} from closedNotifications`);
+          } catch (e) {
+            console.error('Error clearing closedNotifications:', e);
+          }
+          
           // 🔥 НОВОЕ: Перезагружаем активные requests с backend вместо создания локального
           // Ждем немного чтобы backend успел сохранить
           setTimeout(async () => {
@@ -678,18 +718,44 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     }
   };
 
-  const handleRemoveRequest = (itemId: string) => {
-    // 🔥 НОВОЕ: Сохраняем ID закрытых уведомлений в localStorage
-    try {
-      const closedNotifications = JSON.parse(localStorage.getItem('closedNotifications') || '[]');
-      if (!closedNotifications.includes(itemId)) {
-        closedNotifications.push(itemId);
-        localStorage.setItem('closedNotifications', JSON.stringify(closedNotifications));
-      }
-    } catch (e) {
-      console.error('Error saving closed notification:', e);
+  const handleRemoveRequest = async (itemId: string) => {
+    const request = claimRequests.find(req => req.id === itemId);
+    
+    console.log(`🔍 [handleRemoveRequest] Called for itemId: ${itemId}`);
+    console.log(`🔍 [handleRemoveRequest] Found request:`, request);
+    console.log(`🔍 [handleRemoveRequest] All claimRequests:`, claimRequests);
+    
+    // 🔥 ЗАЩИТА: НЕ закрываем pending заявки (они в обработке)
+    if (request && request.status === 'pending') {
+      console.log(`⚠️ [PlayerProfile] Cannot close pending request ${itemId} - status is ${request.status}`);
+      toast.error('Cannot close pending request. Wait for admin response.');
+      return;
     }
     
+    // 🔥 НОВОЕ: Отправляем dismiss на backend (вместо localStorage)
+    if (request && request.status !== 'pending') {
+      try {
+        console.log(`🗑️ [handleRemoveRequest] Calling dismiss API for request: ${request.requestId}`);
+        
+        const response = await fetch(`${API_ENDPOINTS.BASE_URL}/api/user/requests/${request.requestId}/dismiss`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+        });
+        
+        if (response.ok) {
+          console.log(`✅ [handleRemoveRequest] Request ${request.requestId} dismissed on backend`);
+        } else {
+          console.error(`❌ [handleRemoveRequest] Failed to dismiss request ${request.requestId}:`, response.status);
+          // Продолжаем удаление из UI даже если backend не ответил
+        }
+      } catch (e) {
+        console.error('❌ [handleRemoveRequest] Error calling dismiss API:', e);
+        // Продолжаем удаление из UI даже если ошибка
+      }
+    }
+    
+    // Удаляем из списка в UI
+    console.log(`🗑️ [handleRemoveRequest] Removing ${itemId} from claimRequests`);
     setClaimRequests(prev => prev.filter(req => req.id !== itemId));
   };
 
@@ -985,17 +1051,17 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
           )}
 
           {/* Inventory Block */}
-          <div className="border border-white/10 rounded-2xl p-6 pr-8" style={{ backgroundColor: '#131217' }}>
+          <div className="border border-white/10 rounded-2xl p-6 pr-8 relative" style={{ backgroundColor: '#131217', zIndex: 1 }}>
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-bold font-[Rajdhani] uppercase">MY INVENTORY</h2>
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => {
-                  // 🔥 СНАЧАЛА очищаем processingId, ПОТОМ загружаем inventory
-                  clearProcessingId();
+                  // 🔥 НЕ очищаем processingId - просто перезагружаем данные
                   setLoadingInventory(true);
                   fetchInventory();
+                  fetchActiveRequests(); // 🔥 Также обновляем requests
                   toast.success('Refreshing inventory...');
                 }}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
@@ -1218,7 +1284,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
 
                         {/* Action Buttons - Show on Hover */}
                         <AnimatePresence>
-                          {isHovered && (
+                          {isHovered && processingId !== item.id && (
                             <motion.div
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
@@ -1233,35 +1299,18 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                                   e.stopPropagation();
                                   handleClaimItem(item.id, itemType);
                                 }}
-                                disabled={processingId === item.id}
                                 className="flex-1 py-2.5 rounded-lg text-xs font-bold font-[Aldrich] uppercase transition-all pointer-events-auto shadow-lg flex items-center justify-center gap-1.5"
                                 style={{
-                                  background: processingId === item.id
-                                    ? 'linear-gradient(135deg, rgba(107, 114, 128, 0.4) 0%, rgba(75, 85, 99, 0.4) 100%)'
-                                    : 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
+                                  background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.4) 0%, rgba(5, 150, 105, 0.4) 100%)',
                                   backdropFilter: 'blur(10px)',
                                   WebkitBackdropFilter: 'blur(10px)',
-                                  border: processingId === item.id
-                                    ? '1px solid rgba(107, 114, 128, 0.6)'
-                                    : '1px solid rgba(16, 185, 129, 0.6)',
-                                  color: processingId === item.id ? '#9ca3af' : '#10b981',
+                                  border: '1px solid rgba(16, 185, 129, 0.6)',
+                                  color: '#10b981',
                                   boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2), inset 0 1px 1px rgba(255, 255, 255, 0.1)',
-                                  cursor: processingId === item.id ? 'not-allowed' : 'pointer',
-                                  opacity: processingId === item.id ? 0.7 : 1,
+                                  cursor: 'pointer',
                                 }}
                               >
-                                {processingId === item.id ? (
-                                  <>
-                                    <motion.div
-                                      animate={{ rotate: 360 }}
-                                      transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                                      className="w-3 h-3 border-2 border-white/20 border-t-white rounded-full"
-                                    />
-                                    <span className="text-[10px]">ОБРАБОТКА...</span>
-                                  </>
-                                ) : (
-                                  'ПОЛУЧИТЬ'
-                                )}
+                                ПОЛУЧИТЬ
                               </motion.button>
 
                               {/* Red Coin Icon Button - Only for non-money items */}
