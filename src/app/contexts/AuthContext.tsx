@@ -110,6 +110,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
    * Логин пользователя
    */
   const login = async (login: string, password: string): Promise<boolean> => {
+    // Защита от повторных вызовов
+    if (isAuthenticating) {
+      console.log('⚠️ [AuthContext] Login already in progress, ignoring duplicate call');
+      return false;
+    }
+
     console.log('🔐 [AuthContext] Login attempt:', { login });
     console.log('🔐 [AuthContext] Setting isAuthenticating = true');
     setIsAuthenticating(true);
@@ -171,12 +177,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         try {
           console.log('🔑 [AuthContext] Using token for profile fetch:', sessionData.session_token);
           
+          // ⏱️ Добавляем таймаут для fetch запроса
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => {
+            console.log('⏰ [AuthContext] Profile fetch timeout! Aborting...');
+            controller.abort();
+          }, 95000); // 95 секунд таймаут (синхронизировано с backend SmartShell API 90s + запас)
+          
+          console.log('📤 [AuthContext] Sending profile fetch request to:', API_ENDPOINTS.getProfile);
+          
           const profileResponse = await fetch(API_ENDPOINTS.getProfile, {
             headers: {
               'Authorization': `Bearer ${sessionData.session_token}`,
               'Content-Type': 'application/json',
             },
+            signal: controller.signal,
           });
+
+          clearTimeout(timeoutId); // Очищаем таймаут если запрос успешен
 
           console.log('📥 [AuthContext] Profile fetch status:', profileResponse.status);
           console.log('📥 [AuthContext] Profile fetch headers sent:', {

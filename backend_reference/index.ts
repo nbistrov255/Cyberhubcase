@@ -68,7 +68,7 @@ async function gqlRequest<T>(query: string, variables: any = {}, token?: string)
   
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 90000); // ⚡ 90 секунд для тяжёлых запросов
+    const timeoutId = setTimeout(() => controller.abort(), 90000); // ⚡ 90 секунд для тяжёлых запросов (баланс, платежи)
 
     const res = await fetch(url, { method: "POST", headers, body: JSON.stringify({ query, variables }), signal: controller.signal });
     clearTimeout(timeoutId);
@@ -412,7 +412,7 @@ app.get('/api/admin/me', requireAdminSession, async (req, res) => {
 });
 
 // ============================================================================
-// 🔐 ADMIN ITEMS ENDPOINTS (Protected)
+//  ADMIN ITEMS ENDPOINTS (Protected)
 // ============================================================================
 
 app.get("/api/admin/items", requireAdminSession, async (req, res) => {
@@ -688,6 +688,36 @@ app.post("/api/inventory/claim", requireSession, async (req, res) => {
 app.post("/api/user/tradelink", requireSession, async (req, res) => {
     await db.run(`INSERT INTO user_settings (user_uuid, trade_link) VALUES (?, ?) ON CONFLICT(user_uuid) DO UPDATE SET trade_link = excluded.trade_link`, res.locals.session.user_uuid, req.body.trade_link);
     res.json({ success: true });
+});
+
+// 🔥 НОВОЕ: GET /api/user/requests - Получить активные заявки пользователя
+app.get("/api/user/requests", requireSession, async (req, res) => {
+    try {
+        const user_uuid = res.locals.session.user_uuid;
+        
+        // Получаем только активные заявки (pending)
+        const requests = await db.all(`
+            SELECT 
+                r.id as requestId,
+                r.inventory_id as id,
+                r.item_title as itemName,
+                r.status,
+                r.created_at,
+                r.updated_at,
+                r.admin_comment,
+                inv.rarity as itemRarity
+            FROM requests r
+            LEFT JOIN inventory inv ON r.inventory_id = inv.id
+            WHERE r.user_uuid = ? AND r.status IN ('pending', 'approved', 'denied')
+            ORDER BY r.created_at DESC
+        `, user_uuid);
+        
+        console.log(`📋 [User Requests] Found ${requests.length} requests for user ${user_uuid}`);
+        res.json({ success: true, requests });
+    } catch (e: any) {
+        console.error("❌ [User Requests] Error:", e);
+        res.status(500).json({ success: false, error: e.message });
+    }
 });
 
 app.get("/api/admin/requests", requireAdminSession, async (req, res) => {

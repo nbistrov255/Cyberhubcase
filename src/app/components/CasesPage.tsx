@@ -39,19 +39,16 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
   const [cases, setCases] = useState<CaseData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false); // 🔥 НОВОЕ: индикатор обновления
   const [bannerBackground, setBannerBackground] = useState('https://i.ibb.co/nqGS31TR/Chat-GPT-Image-24-2025-04-05-54.png');
   const [stats, setStats] = useState({ casesOpened: 0, uniquePlayers: 0 });
 
-  // 🔥 НОВОЕ: Polling каждые 10 секунд
+  // 🔥 Фоновое обновление каждые 10 секунд (без UI индикатора)
   useEffect(() => {
     if (!isAuthenticated) return;
 
     const pollInterval = setInterval(async () => {
       console.log('🔄 [CasesPage] Polling for updates...');
-      setIsRefreshing(true);
       await refreshProfile();
-      setTimeout(() => setIsRefreshing(false), 500); // Показываем анимацию 500мс
     }, 10000); // 🔥 Каждые 10 секунд
 
     return () => clearInterval(pollInterval);
@@ -659,31 +656,6 @@ export function CasesPage({ onCaseClick, isAuthenticated }: CasesPageProps) {
 
   return (
     <div className="min-h-screen bg-[#17171c] relative">
-      {/* 🔥 НОВОЕ: Серый overlay при обновлении */}
-      <AnimatePresence>
-        {isRefreshing && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 pointer-events-none"
-            style={{
-              background: 'rgba(0, 0, 0, 0.3)',
-              backdropFilter: 'blur(2px)',
-            }}
-          >
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 flex items-center gap-3 px-6 py-3 rounded-lg bg-black/60 backdrop-blur-sm">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full"
-              />
-              <span className="text-white text-sm font-medium">Обновление кейсов...</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* EVENT SECTION - Centered Container */}
       <div className="px-6 py-12">
         <div className="max-w-[1600px] mx-auto">

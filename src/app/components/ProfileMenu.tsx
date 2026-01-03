@@ -109,14 +109,14 @@ export function ProfileMenu({ isOpen, onClose, onInventoryClick, anchorRef }: Pr
                     border: '1px solid rgba(74, 222, 128, 0.3)',
                   }}
                 >
-                  <Package className="w-5 h-5 text-[#4ade80]" />
+                  <User className="w-5 h-5 text-[#4ade80]" />
                 </div>
                 <div className="flex-1 text-left">
                   <div className="text-white font-medium group-hover:text-[#4ade80] transition-colors">
-                    My Inventory
+                    My Profile
                   </div>
                   <div className="text-xs text-gray-400">
-                    View your items
+                    Inventory & History
                   </div>
                 </div>
               </button>

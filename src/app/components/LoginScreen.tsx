@@ -4,7 +4,7 @@ import { Lock, User, AlertCircle, Loader2, Info } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 export function LoginScreen() {
-  const { login, error: authError, isLoading } = useAuth(); // Убрали isAuthenticating
+  const { login, error: authError, isAuthenticating } = useAuth(); // ✅ ИСПРАВЛЕНО: используем isAuthenticating
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [localError, setLocalError] = useState('');
@@ -13,11 +13,18 @@ export function LoginScreen() {
     e.preventDefault();
     setLocalError('');
 
+    // Предотвращаем повторный вызов если уже идет авторизация
+    if (isAuthenticating) {
+      console.log('⚠️ [LoginScreen] Login already in progress, ignoring');
+      return;
+    }
+
     if (!username || !password) {
       setLocalError('Please fill in all fields');
       return;
     }
 
+    console.log('🔐 [LoginScreen] Submitting login form');
     const success = await login(username, password);
     
     if (!success && !authError) {
@@ -179,7 +186,7 @@ export function LoginScreen() {
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    disabled={isLoading}
+                    disabled={isAuthenticating}
                     className="w-full pl-12 pr-4 py-3 rounded-lg bg-black/40 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-[#7c2d3a] focus:ring-2 focus:ring-[#7c2d3a]/20 transition-all"
                     placeholder="Enter your username"
                     autoFocus
@@ -204,7 +211,7 @@ export function LoginScreen() {
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    disabled={isLoading}
+                    disabled={isAuthenticating}
                     className="w-full pl-12 pr-4 py-3 rounded-lg bg-black/40 border border-white/10 text-white placeholder-gray-500 focus:outline-none focus:border-[#7c2d3a] focus:ring-2 focus:ring-[#7c2d3a]/20 transition-all"
                     placeholder="Enter your password"
                   />
@@ -219,7 +226,7 @@ export function LoginScreen() {
               >
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isAuthenticating}
                   className="w-full py-4 rounded-lg font-bold uppercase tracking-wider text-white transition-all duration-300 relative overflow-hidden group"
                   style={{
                     background: 'linear-gradient(135deg, #7c2d3a 0%, #5a1f2a 100%)',
@@ -231,7 +238,7 @@ export function LoginScreen() {
                   
                   {/* Button Content */}
                   <span className="relative z-10 flex items-center justify-center gap-2">
-                    {isLoading ? (
+                    {isAuthenticating ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
                         <span>Logging in...</span>

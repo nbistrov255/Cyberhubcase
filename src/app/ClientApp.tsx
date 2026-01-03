@@ -6,7 +6,6 @@ import { TopBar } from './components/TopBar';
 import { CasesPage } from './components/CasesPage';
 import { CaseOpening } from './components/CaseOpening';
 import { WinPage } from './components/WinPage';
-import { InventoryPage } from './components/InventoryPage';
 import { PlayerProfile } from './components/PlayerProfile';
 import { SettingsModal } from './components/SettingsModal';
 import { CaseContentPage } from './components/CaseContentPage';
@@ -17,7 +16,7 @@ import { LoadingScreen } from './components/LoadingScreen'; // 🔥 НОВЫЙ �
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import { toast, Toaster } from 'sonner';
 
-export type Page = 'cases' | 'opening' | 'win' | 'inventory' | 'profile-public' | 'profile-private' | 'case-content' | 'case-open';
+export type Page = 'cases' | 'opening' | 'win' | 'profile-public' | 'profile-private' | 'case-content' | 'case-open';
 
 export interface InventoryItem {
   id: string;
@@ -84,16 +83,26 @@ function ClientAppContent() {
 
   console.log('🎮 [ClientApp] State:', { isLoading, isAuthenticating, isAuthenticated });
 
-  // 🔥 WebSocket: Real-time обновление баланса - ВАЖНО: хуки ДО условных returns!
-  useWebSocketEvent(`balance:updated:${profile?.id}`, (data: { balance: number }) => {
+  // 🔥 ВАЖНО: ВСЕ хуки ДОЛЖНЫ быть вызваны ДО условных returns!
+  // WebSocket: Real-time обновление баланса
+  useWebSocketEvent(`balance:updated:${profile?.id || 'none'}`, (data: { balance: number }) => {
+    if (!profile?.id) return; // Игнорируем если нет профиля
     console.log('💰 Balance updated:', data.balance);
     refreshProfile(); // Автообновление профиля
   });
 
-  // 🔥 WebSocket: Real-time обновление инвентаря
-  useWebSocketEvent(`inventory:updated:${profile?.id}`, () => {
+  // WebSocket: Real-time обновление инвентаря
+  useWebSocketEvent(`inventory:updated:${profile?.id || 'none'}`, () => {
+    if (!profile?.id) return; // Игнорируем если нет профиля
     console.log('🎒 Inventory updated');
     // Здесь можно добавить обновление инвентаря
+  });
+
+  // WebSocket: Real-time обновление кейсов
+  useWebSocketEvent('cases:updated', () => {
+    console.log('📦 Cases updated by admin, refreshing list...');
+    // Триггерим обновление списка кейсов в CasesPage через key prop
+    setCasesRefreshKey(prev => prev + 1);
   });
 
   // Check maintenance mode
@@ -111,16 +120,16 @@ function ClientAppContent() {
     return <MaintenanceScreen />;
   }
 
-  // 🔥 НОВАЯ ЛОГИКА: Показываем LoginScreen если не авторизован
-  if (!isLoading && !isAuthenticated) {
-    console.log('🔑 [ClientApp] Showing LoginScreen (not authenticated)');
-    return <LoginScreen />;
-  }
-
-  // 🔥 НОВОЕ: Показываем LoadingScreen пока идет проверка авторизации или процесс логина
+  // 🔥 ВАЖНО: Проверяем isAuthenticating ПЕРВЫМ! LoadingScreen показывается пока идет логин
   if (isLoading || isAuthenticating) {
     console.log('⏳ [ClientApp] Showing LoadingScreen:', { isLoading, isAuthenticating });
     return <LoadingScreen />;
+  }
+
+  // 🔥 НОВАЯ ЛОГИКА: Показываем LoginScreen если не авторизован
+  if (!isAuthenticated) {
+    console.log('🔑 [ClientApp] Showing LoginScreen (not authenticated)');
+    return <LoginScreen />;
   }
 
   console.log('✅ [ClientApp] Showing main interface');
@@ -187,13 +196,6 @@ function ClientAppContent() {
     // Убрали toast.success - обновление баланса происходит тихо
   };
 
-  // 🔥 WebSocket: Real-time обновление кейсов
-  useWebSocketEvent('cases:updated', () => {
-    console.log('📦 Cases updated by admin, refreshing list...');
-    // Триггерим обновление списка кейсов в CasesPage через key prop
-    setCasesRefreshKey(prev => prev + 1);
-  });
-
   return (
     <div className="min-h-screen bg-[#17171c] text-white">
       <TopBar
@@ -208,7 +210,7 @@ function ClientAppContent() {
         }}
         onLogoClick={() => setCurrentPage('cases')}
         onBalanceRefresh={refreshProfile}
-        onInventoryClick={() => setCurrentPage('inventory')} // 🔥 НОВОЕ: открытие инвентаря
+        onInventoryClick={() => setCurrentPage('profile-private')} // 🔥 Открытие своего профиля (с инвентарём и историей)
       />
 
       <div className="pt-48">
@@ -218,11 +220,6 @@ function ClientAppContent() {
             item={wonItem}
             onClaim={() => handleClaimItem(wonItem)}
             onGoToInventory={() => setCurrentPage('cases')}
-            onBack={() => setCurrentPage('cases')}
-          />
-        )}
-        {currentPage === 'inventory' && (
-          <InventoryPage
             onBack={() => setCurrentPage('cases')}
           />
         )}

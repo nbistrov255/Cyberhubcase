@@ -52,7 +52,7 @@ function formatTimeRemaining(seconds: number): string {
   return `${minutes}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Countdown Timer Component
+// Countdown Timer Component (пересчитывает время на основе timestamp)
 function CountdownTimer({ 
   request, 
   onUpdate,
@@ -63,18 +63,27 @@ function CountdownTimer({
   onTimeout?: (id: number) => void;
 }) {
   useEffect(() => {
+    const MAX_TIME = 37 * 60; // 37 минут в секундах
+    
     const interval = setInterval(() => {
-      if (request.timeRemaining > 0) {
-        onUpdate(request.id, request.timeRemaining - 1);
-      } else if (request.timeRemaining === 0 && onTimeout) {
-        // Таймер истёк - вызываем callback для автоотмены
+      // 🔥 Вычисляем реальное оставшееся время на основе timestamp
+      const elapsedSeconds = Math.floor((Date.now() - request.timestamp.getTime()) / 1000);
+      const remaining = Math.max(0, MAX_TIME - elapsedSeconds);
+      
+      // Обновляем только если изменилось
+      if (remaining !== request.timeRemaining) {
+        onUpdate(request.id, remaining);
+      }
+      
+      // Если время истекло
+      if (remaining === 0 && onTimeout) {
         onTimeout(request.id);
         clearInterval(interval);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [request.id, request.timeRemaining, onUpdate, onTimeout]);
+  }, [request.id, request.timestamp, request.timeRemaining, onUpdate, onTimeout]);
 
   return null;
 }
@@ -123,38 +132,45 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     }
   }, []);
 
-  // 🔥 ВОССТАНОВЛЕНИЕ claimRequests из localStorage при загрузке
-  useEffect(() => {
+  // 🔥 ЗАГРУЗКА АКТИВНЫХ REQUESTS из BACKEND при загрузке
+  const fetchActiveRequests = async () => {
     try {
-      const savedRequests = localStorage.getItem('player_profile_claim_requests');
-      if (savedRequests) {
-        const parsed = JSON.parse(savedRequests);
-        // Преобразуем timestamp обратно в Date
-        const requests = parsed.map((req: any) => ({
-          ...req,
-          timestamp: new Date(req.timestamp),
-        }));
-        console.log(`📦 [PlayerProfile] Restored ${requests.length} claim requests from localStorage`);
-        setClaimRequests(requests);
+      console.log('📋 [PlayerProfile] Fetching active requests from backend...');
+      const response = await fetch(API_ENDPOINTS.getUserRequests, {
+        headers: getAuthHeaders(),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.requests && data.requests.length > 0) {
+          console.log(`📋 [PlayerProfile] Found ${data.requests.length} active requests from backend`);
+          
+          // Преобразуем backend requests в ClaimRequest формат
+          const activeRequests: ClaimRequest[] = data.requests.map((req: any) => ({
+            id: req.id, // inventory_id
+            requestId: req.requestId, // REQ-XXXXXX
+            itemName: req.itemName,
+            itemRarity: req.itemRarity as keyof typeof rarityColors || 'common',
+            timestamp: new Date(req.created_at), // 🔥 Реальное время создания
+            status: req.status as 'pending' | 'approved' | 'denied',
+            timeRemaining: Math.max(0, 37 * 60 - Math.floor((Date.now() - req.created_at) / 1000)), // 🔥 Вычисляем реальное оставшееся время
+          }));
+          
+          setClaimRequests(activeRequests);
+          console.log('✅ [PlayerProfile] Active requests loaded from backend');
+        } else {
+          console.log('📋 [PlayerProfile] No active requests found');
+          setClaimRequests([]);
+        }
       }
     } catch (error) {
-      console.error('Error loading claim requests from localStorage:', error);
+      console.error('❌ [PlayerProfile] Error fetching active requests:', error);
     }
-  }, []);
+  };
 
-  // 🔥 СОХРАНЕНИЕ claimRequests в localStorage при изменении
   useEffect(() => {
-    try {
-      if (claimRequests.length > 0) {
-        localStorage.setItem('player_profile_claim_requests', JSON.stringify(claimRequests));
-        console.log(`💾 [PlayerProfile] Saved ${claimRequests.length} claim requests to localStorage`);
-      } else {
-        localStorage.removeItem('player_profile_claim_requests');
-      }
-    } catch (error) {
-      console.error('Error saving claim requests to localStorage:', error);
-    }
-  }, [claimRequests]);
+    fetchActiveRequests();
+  }, []);
 
   // Загрузка фона профиля из настроек
   useEffect(() => {
@@ -609,20 +625,11 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
           // Money - мгновенный polling
           startPolling(itemId, type);
         } else {
-          // Skins/Physical - показываем pop-up уведомление
+          // Skins/Physical - показываем pop-up уведомление и перезагружаем requests с backend
           toast.success('Request sent to Admin!');
           
-          const newRequest: ClaimRequest = {
-            id: itemId,
-            requestId: result.requestId || generateRequestId(), // Используем requestId из backend или генерируем
-            itemName: item.title || item.name || 'Unknown Item',
-            itemRarity: (item.rarity || 'common') as keyof typeof rarityColors,
-            timestamp: new Date(),
-            status: 'pending',
-            timeRemaining: 3600, // 60 минут в секундах
-          };
-          
-          setClaimRequests(prev => [...prev, newRequest]);
+          // 🔥 НОВОЕ: Перезагружаем активные requests с backend вместо создания локального
+          await fetchActiveRequests();
           // НЕ очищаем processingId - он будет показывать loader на карточке
         }
       }
