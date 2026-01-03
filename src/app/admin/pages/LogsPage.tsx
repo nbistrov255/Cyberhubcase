@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'motion/react';
-import { Search, Calendar } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Search, Filter, FileText, AlertTriangle, Info, CheckCircle } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
-import { toast } from 'sonner';
+import { getAdminAuthHeaders } from '../utils/adminAuth';
 
 interface Log {
   id: string;
@@ -32,12 +32,9 @@ export function LogsPage({ userRole }: LogsPageProps) {
   const fetchLogs = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('session_token');
       
       const response = await fetch('/api/admin/logs', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAdminAuthHeaders(),
       });
 
       if (!response.ok) {

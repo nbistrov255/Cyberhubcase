@@ -4,7 +4,7 @@ import { Search, Eye, Check, X, RotateCcw } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
 import { toast } from 'sonner';
-import { API_ENDPOINTS, getAuthHeaders } from '../../../config/api';
+import { getAdminAuthHeaders } from '../utils/adminAuth';
 
 interface Request {
   id: string;
@@ -46,8 +46,8 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
     try {
       setLoading(true);
       
-      const response = await fetch(API_ENDPOINTS.getRequests, {
-        headers: getAuthHeaders(),
+      const response = await fetch('/api/admin/requests', {
+        headers: getAdminAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -55,11 +55,12 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
       }
 
       const data = await response.json();
+      console.log('📋 [RequestsPage] Received data:', data);
       
-      // Преобразуем данные из API в формат компонента
-      const formattedRequests = (data || []).map((req: any) => ({
-        id: req.id,
-        requestId: req.id, // Backend уже возвращает REQ-XXXXXX
+      // Backend возвращает массив напрямую
+      const formattedRequests = (Array.isArray(data) ? data : []).map((req: any) => ({
+        id: req.id, // REQ-123456
+        requestId: req.id,
         user: {
           nickname: req.user_nickname || 'Unknown',
           phone: req.user_phone || 'N/A',
@@ -73,13 +74,14 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
         },
         case: req.case_name || 'Unknown Case',
         pc: req.pc_id || 'N/A',
-        date: req.created_at ? new Date(req.created_at) : new Date(),
+        date: req.created_at ? new Date(req.created_at * 1000) : new Date(), // Unix timestamp в миллисекунды
         status: req.status || 'pending',
       }));
 
+      console.log('✅ [RequestsPage] Formatted requests:', formattedRequests);
       setRequests(formattedRequests);
     } catch (error) {
-      console.error('Error fetching requests:', error);
+      console.error('❌ [RequestsPage] Error fetching requests:', error);
       toast.error('Failed to load requests');
       setRequests([]); // Устанавливаем пустой массив при ошибке
     } finally {
@@ -118,9 +120,9 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
 
   const handleApprove = async (id: string) => {
     try {
-      const response = await fetch(API_ENDPOINTS.approveRequestById(id), {
+      const response = await fetch(`/api/admin/requests/${id}/approve`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: getAdminAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -137,9 +139,9 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
 
   const handleDeny = async (id: string) => {
     try {
-      const response = await fetch(API_ENDPOINTS.denyRequestById(id), {
+      const response = await fetch(`/api/admin/requests/${id}/deny`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: getAdminAuthHeaders(),
         body: JSON.stringify({ comment: 'Denied by admin' }),
       });
 
@@ -157,9 +159,9 @@ export function RequestsPage({ userRole }: RequestsPageProps) {
 
   const handleReturn = async (id: string) => {
     try {
-      const response = await fetch(API_ENDPOINTS.returnRequestById(id), {
+      const response = await fetch(`/api/admin/requests/${id}/return`, {
         method: 'POST',
-        headers: getAuthHeaders(),
+        headers: getAdminAuthHeaders(),
       });
 
       if (!response.ok) {

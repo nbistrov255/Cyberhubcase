@@ -13,6 +13,7 @@ import { AdminLanguageProvider } from './contexts/AdminLanguageContext';
 // ✅ ДОБАВЛЕН ИМПОРТ WebSocketProvider
 import { WebSocketProvider } from '../contexts/WebSocketContext';
 import { toast } from 'sonner';
+import { getAdminToken, setAdminToken, clearAdminToken } from './utils/adminAuth';
 
 export type AdminPage = 
   | 'login'
@@ -44,15 +45,15 @@ export default function AdminApp() {
   // 🔥 НОВОЕ: Проверка существующей сессии при загрузке
   useEffect(() => {
     const checkExistingSession = async () => {
-      const token = localStorage.getItem('session_token');
+      const token = getAdminToken();
       
       if (!token) {
-        console.log('🔐 [AdminApp] No token found, showing login');
+        console.log('🔐 [AdminApp] No admin token found, showing login');
         setIsCheckingSession(false);
         return;
       }
 
-      console.log('🔐 [AdminApp] Found token, validating...');
+      console.log('🔐 [AdminApp] Found admin token, validating...');
       
       try {
         const response = await fetch('/api/admin/me', {
@@ -63,8 +64,8 @@ export default function AdminApp() {
         });
 
         if (!response.ok) {
-          console.log('❌ [AdminApp] Token invalid, clearing...');
-          localStorage.removeItem('session_token');
+          console.log('❌ [AdminApp] Admin token invalid, clearing...');
+          clearAdminToken();
           setIsCheckingSession(false);
           return;
         }
@@ -72,7 +73,7 @@ export default function AdminApp() {
         const data = await response.json();
         
         if (data.success && data.admin) {
-          console.log('✅ [AdminApp] Session restored:', data.admin.username);
+          console.log('✅ [AdminApp] Admin session restored:', data.admin.username);
           setCurrentUser({
             id: data.admin.id,
             username: data.admin.username,
@@ -82,11 +83,11 @@ export default function AdminApp() {
           setCurrentPage('dashboard');
           toast.success(`Welcome back, ${data.admin.username}!`);
         } else {
-          localStorage.removeItem('session_token');
+          clearAdminToken();
         }
       } catch (error) {
-        console.error('❌ [AdminApp] Session check error:', error);
-        localStorage.removeItem('session_token');
+        console.error('❌ [AdminApp] Admin session check error:', error);
+        clearAdminToken();
       } finally {
         setIsCheckingSession(false);
       }
@@ -123,9 +124,9 @@ export default function AdminApp() {
       console.log('✅ [AdminApp] Login response:', data);
 
       if (data.success && data.session_token) {
-        // Сохраняем токен в localStorage
-        localStorage.setItem('session_token', data.session_token);
-        console.log('💾 [AdminApp] Token saved to localStorage');
+        // Сохраняем токен в localStorage с отдельным ключом для админа
+        setAdminToken(data.session_token);
+        console.log('💾 [AdminApp] Admin token saved to localStorage');
 
         // Устанавливаем пользователя
         setCurrentUser({
@@ -153,7 +154,7 @@ export default function AdminApp() {
 
   const handleLogout = () => {
     console.log('🚪 [AdminApp] Logging out...');
-    localStorage.removeItem('session_token');
+    clearAdminToken();
     setCurrentUser(null);
     setCurrentPage('login');
     toast.success('Logged out successfully');

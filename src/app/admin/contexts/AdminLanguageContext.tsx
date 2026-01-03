@@ -325,6 +325,7 @@ const adminTranslations: Record<AdminLanguage, Record<string, string>> = {
     'settings.disabled': 'Disabled',
     'settings.lowStockThreshold': 'Low Stock Threshold',
     'settings.expireTtl': 'Prize Expiration (Hours)',
+    'settings.requestTimeoutMinutes': 'Request Timeout (Minutes)',
     'settings.rarities': 'Rarity Settings',
     'settings.presets': 'Rarity Presets',
 
@@ -657,6 +658,7 @@ const adminTranslations: Record<AdminLanguage, Record<string, string>> = {
     'settings.disabled': 'Disabled',
     'settings.lowStockThreshold': 'Low Stock Threshold',
     'settings.expireTtl': 'Prize Expiration (Hours)',
+    'settings.requestTimeoutMinutes': 'Request Timeout (Minutes)',
     'settings.rarities': 'Rarity Settings',
     'settings.presets': 'Rarity Presets',
 
@@ -989,6 +991,7 @@ const adminTranslations: Record<AdminLanguage, Record<string, string>> = {
     'settings.disabled': 'Disabled',
     'settings.lowStockThreshold': 'Low Stock Threshold',
     'settings.expireTtl': 'Prize Expiration (Hours)',
+    'settings.requestTimeoutMinutes': 'Request Timeout (Minutes)',
     'settings.rarities': 'Rarity Settings',
     'settings.presets': 'Rarity Presets',
 

@@ -3,6 +3,7 @@ import { TrendingUp, FileText, AlertTriangle, Package, ArrowRight } from 'lucide
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { AdminPage } from '../AdminApp';
 import { useEffect, useState } from 'react';
+import { getAdminAuthHeaders } from '../utils/adminAuth';
 
 interface DashboardPageProps {
   onNavigate?: (page: AdminPage) => void;
@@ -29,15 +30,14 @@ export function DashboardPage({ onNavigate }: DashboardPageProps) {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const token = localStorage.getItem('session_token');
         
         // Загружаем все данные параллельно
         const [requestsRes, dropsRes] = await Promise.all([
           fetch('/api/admin/requests?status=pending', {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: getAdminAuthHeaders(),
           }),
           fetch('/api/drops/recent', {
-            headers: { 'Authorization': `Bearer ${token}` },
+            headers: getAdminAuthHeaders(),
           }),
         ]);
 

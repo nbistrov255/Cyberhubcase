@@ -5,8 +5,8 @@ import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
 import { CaseFormModal, CaseFormData } from '../components/CaseFormModal';
 import { toast } from 'sonner';
-// ✅ ДОБАВЛЕН ИМПОРТ ЗАГОЛОВКОВ АВТОРИЗАЦИИ
-import { getAuthHeaders } from '../../../config/api';
+// ✅ ИСПРАВЛЕНО: Используем админские заголовки
+import { getAdminAuthHeaders } from '../utils/adminAuth';
 // ✅ ДОБАВЛЕН ИМПОРТ WebSocket ХУКА
 import { useWebSocketEvent } from '../../contexts/WebSocketContext';
 
@@ -51,9 +51,9 @@ export function CasesPage({ userRole }: CasesPageProps) {
   const fetchCases = async () => {
     try {
       setLoading(true);
-      // ✅ ИСПРАВЛЕНО: Добавлены заголовки с токеном!
+      // ✅ ИСПРАВЛЕНО: Используем админские заголовки!
       const response = await fetch('/api/admin/cases', {
-        headers: getAuthHeaders(),
+        headers: getAdminAuthHeaders(),
       });
       
       if (!response.ok) {
@@ -168,20 +168,14 @@ export function CasesPage({ userRole }: CasesPageProps) {
         // ✅ Используем PUT метод для обновления существующего кейса
         response = await fetch(`/api/admin/cases/${caseId}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeaders(), // ✅ Добавлены заголовки авторизации
-          },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify(apiPayload),
         });
       } else {
         // Создание нового кейса
         response = await fetch('/api/admin/cases', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...getAuthHeaders(), // ✅ Добавлены заголовки авторизации
-          },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify(apiPayload),
         });
       }
@@ -205,7 +199,7 @@ export function CasesPage({ userRole }: CasesPageProps) {
     try {
       const response = await fetch(`/api/admin/cases/${caseId}`, {
         method: 'DELETE',
-        headers: getAuthHeaders(),
+        headers: getAdminAuthHeaders(),
       });
 
       if (!response.ok) {

@@ -250,7 +250,7 @@ export function TopBar({
                 <div className="flex items-center gap-2 pr-3 border-r border-white/10">
                   <DollarSign className="w-4 h-4 text-[#4ade80]" strokeWidth={2.5} />
                   <span className="text-sm font-bold text-white">
-                    {profile.balance?.toFixed(2) || '0.00'} €
+                    {profile?.balance != null ? profile.balance.toFixed(2) : '0.00'} €
                   </span>
                 </div>
 

@@ -285,11 +285,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const data: GetProfileResponse = await response.json();
 
       if (data.success && data.profile) {
-        setProfile(data.profile);
+        // ✅ Безопасное обновление - сохраняем предыдущие значения если новые отсутствуют
+        setProfile(prev => ({
+          ...prev,
+          ...data.profile,
+          // Если balance undefined/null в новых данных - оставляем старый
+          balance: data.profile.balance ?? prev?.balance ?? 0,
+        }));
       }
     } catch (err) {
       console.error('Refresh profile error:', err);
-      setError('Failed to refresh profile');
+      // ✅ Не очищаем профиль при ошибке обновления
+      // setError('Failed to refresh profile');
     }
   };
 

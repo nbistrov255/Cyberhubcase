@@ -5,6 +5,7 @@ import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
 import { ItemFormModal } from '../components/ItemFormModal';
 import { toast } from 'sonner';
+import { getAdminAuthHeaders } from '../utils/adminAuth';
 
 interface Item {
   id: number;
@@ -39,11 +40,8 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('session_token');
       const response = await fetch('/api/admin/items', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAdminAuthHeaders(),
       });
       
       if (!response.ok) {
@@ -84,21 +82,16 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
 
   const handleSaveItem = async (itemData: any) => {
     try {
-      const token = localStorage.getItem('session_token');
       
       console.log('🔥 [ItemsPage] handleSaveItem called');
       console.log('📦 [ItemsPage] itemData:', itemData);
-      console.log('🔑 [ItemsPage] token:', token ? 'EXISTS' : 'MISSING');
       
       if (editingItem) {
         // Обновление существующего предмета
         console.log('✏️ [ItemsPage] Updating item:', editingItem.id);
         const response = await fetch(`/api/admin/items/${editingItem.id}`, {
           method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify(itemData),
         });
 
@@ -115,10 +108,7 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
         console.log('➕ [ItemsPage] Creating new item');
         const response = await fetch('/api/admin/items', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: getAdminAuthHeaders(),
           body: JSON.stringify(itemData),
         });
 
@@ -147,12 +137,9 @@ export function ItemsPage({ userRole }: ItemsPageProps) {
     if (!confirm(t('items.deleteConfirm'))) return;
 
     try {
-      const token = localStorage.getItem('session_token');
       const response = await fetch(`/api/admin/items/${id}`, {
         method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAdminAuthHeaders(),
       });
 
       if (!response.ok) {

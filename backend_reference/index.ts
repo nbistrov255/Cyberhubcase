@@ -158,6 +158,16 @@ async function requireSession(req: express.Request, res: express.Response, next:
   const session = await db.get("SELECT * FROM sessions WHERE token = ?", token);
   if (!session) return res.status(401).json({ error: "Invalid session" });
   
+  // 🔥 ПРОВЕРКА expires_at
+  if (session.expires_at && session.expires_at < Date.now()) {
+    console.log(`❌ [Auth] Session expired for user ${session.user_uuid}`);
+    await db.run("DELETE FROM sessions WHERE token = ?", token);
+    return res.status(401).json({ error: "Session expired" });
+  }
+  
+  // 🔥 ОБНОВЛЕНИЕ last_seen_at для продления сессии
+  await db.run("UPDATE sessions SET last_seen_at = ? WHERE token = ?", Date.now(), token);
+  
   const settings = await db.get("SELECT * FROM user_settings WHERE user_uuid = ?", session.user_uuid);
   res.locals.session = { ...session, ...settings };
   next();
@@ -745,7 +755,7 @@ app.post("/api/admin/requests/:id/approve", requireAdminSession, async (req, res
     try {
         await db.run("BEGIN TRANSACTION");
         await db.run("UPDATE requests SET status = 'approved', updated_at = ? WHERE id = ?", Date.now(), req.params.id);
-        const reqData = await db.get("SELECT inventory_id FROM requests WHERE id = ?", req.params.id);
+        const reqData = await db.get("SELECT inventory_id, user_uuid FROM requests WHERE id = ?", req.params.id);
         
         if (!reqData) {
             await db.run("ROLLBACK");
@@ -756,6 +766,14 @@ app.post("/api/admin/requests/:id/approve", requireAdminSession, async (req, res
         await db.run("COMMIT");
         
         console.log(`✅ [Admin] Request ${req.params.id} approved`);
+        
+        // 🔥 WebSocket: Уведомляем пользователя об обновлении инвентаря
+        const io = req.app.get("io");
+        if (io && reqData.user_uuid) {
+            io.to(`user:${reqData.user_uuid}`).emit(`inventory:updated:${reqData.user_uuid}`);
+            console.log(`🔥 WebSocket: inventory updated for user ${reqData.user_uuid} (request approved)`);
+        }
+        
         res.json({ success: true });
     } catch (e: any) {
         await db.run("ROLLBACK");
@@ -768,9 +786,17 @@ app.post("/api/admin/requests/:id/deny", requireAdminSession, async (req, res) =
     try {
         await db.run("BEGIN TRANSACTION");
         await db.run("UPDATE requests SET status = 'denied', admin_comment = ?, updated_at = ? WHERE id = ?", req.body.comment, Date.now(), req.params.id);
-        const reqData = await db.get("SELECT inventory_id FROM requests WHERE id = ?", req.params.id);
+        const reqData = await db.get("SELECT inventory_id, user_uuid FROM requests WHERE id = ?", req.params.id);
         await db.run("UPDATE inventory SET status = 'available', updated_at = ? WHERE id = ?", Date.now(), reqData.inventory_id);
         await db.run("COMMIT");
+        
+        // 🔥 WebSocket: Уведомляем пользователя об обновлении инвентаря
+        const io = req.app.get("io");
+        if (io && reqData.user_uuid) {
+            io.to(`user:${reqData.user_uuid}`).emit(`inventory:updated:${reqData.user_uuid}`);
+            console.log(`🔥 WebSocket: inventory updated for user ${reqData.user_uuid} (request denied)`);
+        }
+        
         res.json({ success: true });
     } catch (e: any) {
         await db.run("ROLLBACK");
@@ -783,9 +809,17 @@ app.post("/api/admin/requests/:id/return", requireAdminSession, async (req, res)
     try {
         await db.run("BEGIN TRANSACTION");
         await db.run("UPDATE requests SET status = 'returned', updated_at = ? WHERE id = ?", Date.now(), req.params.id);
-        const reqData = await db.get("SELECT inventory_id FROM requests WHERE id = ?", req.params.id);
+        const reqData = await db.get("SELECT inventory_id, user_uuid FROM requests WHERE id = ?", req.params.id);
         await db.run("UPDATE inventory SET status = 'available', updated_at = ? WHERE id = ?", Date.now(), reqData.inventory_id);
         await db.run("COMMIT");
+        
+        // 🔥 WebSocket: Уведомляем пользователя об обновлении инвентаря
+        const io = req.app.get("io");
+        if (io && reqData.user_uuid) {
+            io.to(`user:${reqData.user_uuid}`).emit(`inventory:updated:${reqData.user_uuid}`);
+            console.log(`🔥 WebSocket: inventory updated for user ${reqData.user_uuid} (request returned)`);
+        }
+        
         res.json({ success: true });
     } catch (e: any) {
         await db.run("ROLLBACK");

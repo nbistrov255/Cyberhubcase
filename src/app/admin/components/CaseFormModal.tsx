@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Save, Upload, Plus, Trash2, Info } from 'lucide-react';
+import { X, Plus, Trash2, Upload, Calendar } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
+import { getAdminAuthHeaders } from '../utils/adminAuth';
 
 // Rarity type definition
 type Rarity = 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
@@ -93,35 +94,34 @@ export function CaseFormModal({ isOpen, onClose, onSave, caseData }: CaseFormMod
     const fetchItems = async () => {
       try {
         setLoadingItems(true);
-        const token = localStorage.getItem('session_token');
         const response = await fetch('/api/admin/items', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: getAdminAuthHeaders(),
         });
         
-        if (response.ok) {
-          const data = await response.json();
-          
-          // --- ИСПРАВЛЕНИЕ: Backend возвращает { success: true, items: [...] } ---
-          const rawItems = data.items || data || [];
-          
-          if (Array.isArray(rawItems)) {
-            const items: Item[] = rawItems.map((item: any) => ({
-              id: item.id.toString(),
-              nameLv: item.title, // API возвращает только title, используем его для всех языков
-              nameRu: item.title,
-              nameEn: item.title,
-              type: item.type === 'skin' ? 'virtual' : item.type === 'money' ? 'balance' : 'physical',
-              rarity: item.rarity || 'common', // Если rarity нет, используем common
-              image: item.image_url,
-              stock: item.stock ?? -1, // Если stock нет, используем -1 (бесконечно)
-              isActive: true,
-            }));
-            setAvailableItems(items);
-          } else {
-            setAvailableItems([]);
-          }
+        if (!response.ok) {
+          throw new Error('Failed to fetch items');
+        }
+
+        const data = await response.json();
+        
+        // --- ИСПРАВЛЕНИЕ: Backend возвращает { success: true, items: [...] } ---
+        const rawItems = data.items || data || [];
+        
+        if (Array.isArray(rawItems)) {
+          const items: Item[] = rawItems.map((item: any) => ({
+            id: item.id.toString(),
+            nameLv: item.title, // API возвращает только title, используем его для всех языков
+            nameRu: item.title,
+            nameEn: item.title,
+            type: item.type === 'skin' ? 'virtual' : item.type === 'money' ? 'balance' : 'physical',
+            rarity: item.rarity || 'common', // Если rarity нет, используем common
+            image: item.image_url,
+            stock: item.stock ?? -1, // Если stock нет, используем -1 (бесконечно)
+            isActive: true,
+          }));
+          setAvailableItems(items);
+        } else {
+          setAvailableItems([]);
         }
       } catch (error) {
         console.error('Error fetching items:', error);

@@ -3,8 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { ArrowLeft, Edit2, Save, HelpCircle, X, CheckCircle, Clock, Minimize2, Maximize2, ChevronLeft, ChevronRight, Info, Trash2, Check, Coins, CircleCheck, CircleX, Loader2, RotateCcw } from 'lucide-react';
 import { FooterSection } from './FooterSection';
 import { useAuth } from '../contexts/AuthContext';
+import { useWebSocket } from '../contexts/WebSocketContext';
 import { API_ENDPOINTS, getAuthHeaders } from '../../config/api';
 import { toast } from 'sonner';
+import { RequestNotifications } from './RequestNotifications';
 
 interface PlayerProfileProps {
   isPrivate: boolean;
@@ -13,12 +15,17 @@ interface PlayerProfileProps {
 }
 
 interface ClaimRequest {
-  id: number; // 🔥 Изменён на number для соответствия inventory_id
+  id: string; // ✅ Изменён на string для совместимости с RequestNotifications
   requestId: string;
   itemName: string;
-  itemRarity: keyof typeof rarityColors;
-  timestamp: Date;
-  status: 'pending' | 'approved' | 'denied'; // 🔥 ИЗМЕНЕНО: 'rejected' → 'denied'
+  itemImage: string; // ✅ Добавлено
+  itemRarity: 'common' | 'rare' | 'epic' | 'legendary' | 'mythic';
+  itemType: 'skin' | 'physical' | 'money'; // ✅ Добавлено
+  caseName: string; // ✅ Добавлено
+  tradeLink?: string; // ✅ Добавлено
+  comment?: string; // ✅ Добавлено
+  createdAt: Date;
+  status: 'pending' | 'approved' | 'denied';
   timeRemaining: number; // seconds
 }
 
@@ -35,59 +42,6 @@ const rarityColors = {
   Mythic: '#ef4444',
 };
 
-// Generate random request ID
-function generateRequestId(): string {
-  return `REQ-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-}
-
-// Format time remaining (seconds to MM:SS)
-function formatTimeRemaining(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = seconds % 60;
-  
-  if (hours > 0) {
-    return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${secs.toString().padStart(2, '0')}`;
-}
-
-// Countdown Timer Component (пересчитывает время на основе timestamp)
-function CountdownTimer({ 
-  request, 
-  onUpdate,
-  onTimeout 
-}: { 
-  request: ClaimRequest; 
-  onUpdate: (id: number, timeRemaining: number) => void;
-  onTimeout?: (id: number) => void;
-}) {
-  useEffect(() => {
-    const MAX_TIME = 37 * 60; // 37 минут в секундах
-    
-    const interval = setInterval(() => {
-      // 🔥 Вычисляем реальное оставшееся время на основе timestamp
-      const elapsedSeconds = Math.floor((Date.now() - request.timestamp.getTime()) / 1000);
-      const remaining = Math.max(0, MAX_TIME - elapsedSeconds);
-      
-      // Обновляем только если изменилось
-      if (remaining !== request.timeRemaining) {
-        onUpdate(request.id, remaining);
-      }
-      
-      // Если время истекло
-      if (remaining === 0 && onTimeout) {
-        onTimeout(request.id);
-        clearInterval(interval);
-      }
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [request.id, request.timestamp, request.timeRemaining, onUpdate, onTimeout]);
-
-  return null;
-}
-
 export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfileProps) {
   const { profile, refreshProfile } = useAuth();
   const [tradeLink, setTradeLink] = useState('https://steamcommunity.com/tradeoffer/new/?partner=123456789&token=abcdef');
@@ -95,14 +49,13 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
   const [isSavingLink, setIsSavingLink] = useState(false);
   const [showLevelsModal, setShowLevelsModal] = useState(false);
   const [claimRequests, setClaimRequests] = useState<ClaimRequest[]>([]);
-  const [hoveredItemId, setHoveredItemId] = useState<number | null>(null); // 🔥 Изменён на number
-  const [minimizedRequests, setMinimizedRequests] = useState<Set<number>>(new Set()); // 🔥 Изменён на number
+  const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
   const [inventoryPage, setInventoryPage] = useState(0);
   const [winHistoryPage, setWinHistoryPage] = useState(0);
   const [profileBackground, setProfileBackground] = useState('https://i.ibb.co/0jf2XZFw/Chat-GPT-Image-25-2025-00-01-32.png');
   const [inventory, setInventory] = useState<any[]>([]);
   const [loadingInventory, setLoadingInventory] = useState(true);
-  const [processingId, setProcessingId] = useState<number | null>(null); // 🔥 Изменён на number для правильного сравнения
+  const [processingId, setProcessingId] = useState<number | null>(null);
   
   const [winHistory, setWinHistory] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
@@ -145,18 +98,39 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
         if (data.success && data.requests && data.requests.length > 0) {
           console.log(`📋 [PlayerProfile] Found ${data.requests.length} active requests from backend`);
           
+          // 🔥 Получаем настройку timeout из localStorage
+          let requestTimeoutMinutes = 5; // По умолчанию 5 минут
+          try {
+            const settings = localStorage.getItem('siteSettings');
+            if (settings) {
+              const parsed = JSON.parse(settings);
+              requestTimeoutMinutes = parsed.requestTimeoutMinutes || 5;
+            }
+          } catch (e) {
+            console.error('Error reading requestTimeoutMinutes:', e);
+          }
+          
           // Преобразуем backend requests в ClaimRequest формат
           const activeRequests: ClaimRequest[] = data.requests.map((req: any) => ({
-            id: req.id, // inventory_id
-            requestId: req.requestId, // REQ-XXXXXX
-            itemName: req.itemName,
-            itemRarity: req.itemRarity as keyof typeof rarityColors || 'common',
-            timestamp: new Date(req.created_at), // 🔥 Реальное время создания
+            id: String(req.id), // ✅ Конвертируем в string
+            requestId: req.requestId || `REQ-${req.id}`, // REQ-XXXXXX
+            itemName: req.itemName || 'Unknown Item',
+            itemImage: req.itemImage || req.image_url || 'https://via.placeholder.com/200',
+            itemRarity: (req.itemRarity || 'common') as 'common' | 'rare' | 'epic' | 'legendary' | 'mythic',
+            itemType: (req.itemType || 'skin') as 'skin' | 'physical' | 'money',
+            caseName: req.caseName || 'Unknown Case',
+            tradeLink: req.tradeLink || undefined,
+            comment: req.comment || undefined,
+            createdAt: new Date(req.created_at || Date.now()), // 🔥 Реальное время создания
             status: req.status as 'pending' | 'approved' | 'denied',
-            timeRemaining: Math.max(0, 37 * 60 - Math.floor((Date.now() - req.created_at) / 1000)), // 🔥 Вычисляем реальное оставшееся время
+            timeRemaining: Math.max(0, requestTimeoutMinutes * 60 - Math.floor((Date.now() - (req.created_at || Date.now())) / 1000)), // 🔥 Настраиваемый таймер
           }));
           
-          setClaimRequests(activeRequests);
+          // 🔥 НОВОЕ: Фильтруем закрытые уведомления
+          const closedNotifications = JSON.parse(localStorage.getItem('closedNotifications') || '[]');
+          const filteredRequests = activeRequests.filter(req => !closedNotifications.includes(req.id));
+          
+          setClaimRequests(filteredRequests);
           console.log('✅ [PlayerProfile] Active requests loaded from backend');
         } else {
           console.log('📋 [PlayerProfile] No active requests found');
@@ -239,6 +213,28 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     fetchInventory();
   }, []);
 
+  // 🔥 WebSocket: Подписка на обновления инвентаря
+  const { on, off } = useWebSocket();
+  
+  useEffect(() => {
+    if (!profile?.uuid) return;
+    
+    const handleInventoryUpdate = () => {
+      console.log('🔔 [PlayerProfile] Inventory updated via WebSocket, refreshing...');
+      fetchInventory();
+      fetchActiveRequests(); // 🔥 Обновляем также requests
+    };
+    
+    // Подписываемся на событие для текущего пользователя
+    on(`inventory:updated:${profile.uuid}`, handleInventoryUpdate);
+    console.log(`✅ [PlayerProfile] Subscribed to inventory:updated:${profile.uuid}`);
+    
+    return () => {
+      off(`inventory:updated:${profile.uuid}`, handleInventoryUpdate);
+      console.log(`❌ [PlayerProfile] Unsubscribed from inventory:updated:${profile.uuid}`);
+    };
+  }, [profile?.uuid, on, off]);
+
   // 🔥 AUTO-RESTART POLLING для processing items при возвращении на страницу
   useEffect(() => {
     if (loadingInventory) return;
@@ -275,7 +271,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
         
         // Проверяем статус каждой активной заявки
         claimRequests.forEach((localRequest) => {
-          const serverRequest = (data || []).find((r: any) => r.id === localRequest.id);
+          const serverRequest = (data || []).find((r: any) => String(r.id) === localRequest.id);
           
           if (serverRequest) {
             if (serverRequest.status === 'approved' && localRequest.status !== 'approved') {
@@ -290,7 +286,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
               ));
               
               // Удаляем item из inventory
-              setInventory(prev => prev.filter(i => i.id !== localRequest.id));
+              setInventory(prev => prev.filter(i => String(i.id) !== localRequest.id));
               
               toast.success(
                 <div className="flex items-center gap-3">
@@ -303,7 +299,11 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
               // 🔥 АВТОЗАКРЫТИЕ через 5 секунд
               setTimeout(() => {
                 handleRemoveRequest(localRequest.id);
-                clearProcessingId();
+                // 🔥 ИСПРАВЛЕНИЕ: очищаем processingId для этого item
+                const itemId = parseInt(localRequest.id);
+                if (processingId === itemId) {
+                  clearProcessingId();
+                }
               }, 5000);
               
             } else if ((serverRequest.status === 'denied' || serverRequest.status === 'expired') && localRequest.status !== 'denied') {
@@ -328,7 +328,11 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
               // 🔥 АВТОЗАКРЫТИЕ через 5 секунд
               setTimeout(() => {
                 handleRemoveRequest(localRequest.id);
-                clearProcessingId();
+                // 🔥 ИСПРАВЛЕНИЕ: очищаем processingId для этого item
+                const itemId = parseInt(localRequest.id);
+                if (processingId === itemId) {
+                  clearProcessingId();
+                }
               }, 5000);
             }
           }
@@ -629,7 +633,11 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
           toast.success('Request sent to Admin!');
           
           // 🔥 НОВОЕ: Перезагружаем активные requests с backend вместо создания локального
-          await fetchActiveRequests();
+          // Ждем немного чтобы backend успел сохранить
+          setTimeout(async () => {
+            await fetchActiveRequests();
+            await fetchInventory(); // 🔥 Обновляем инвентарь чтобы показать статус 'processing'
+          }, 500);
           // НЕ очищаем processingId - он будет показывать loader на карточке
         }
       }
@@ -670,20 +678,25 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
     }
   };
 
-  const handleRemoveRequest = (itemId: number) => {
+  const handleRemoveRequest = (itemId: string) => {
+    // 🔥 НОВОЕ: Сохраняем ID закрытых уведомлений в localStorage
+    try {
+      const closedNotifications = JSON.parse(localStorage.getItem('closedNotifications') || '[]');
+      if (!closedNotifications.includes(itemId)) {
+        closedNotifications.push(itemId);
+        localStorage.setItem('closedNotifications', JSON.stringify(closedNotifications));
+      }
+    } catch (e) {
+      console.error('Error saving closed notification:', e);
+    }
+    
     setClaimRequests(prev => prev.filter(req => req.id !== itemId));
   };
 
-  const handleToggleMinimize = (itemId: number) => {
-    setMinimizedRequests(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(itemId)) {
-        newSet.delete(itemId);
-      } else {
-        newSet.add(itemId);
-      }
-      return newSet;
-    });
+  const handleUpdateRequestTime = (itemId: string, timeRemaining: number) => {
+    setClaimRequests(prev => 
+      prev.map(req => req.id === itemId ? { ...req, timeRemaining } : req)
+    );
   };
 
   return (
@@ -1034,7 +1047,7 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
                   >
                     {currentItems.map((item) => {
                     const isHovered = hoveredItemId === item.id;
-                    const hasClaimRequest = claimRequests.some(req => req.id === item.id);
+                    const hasClaimRequest = claimRequests.some(req => req.id === String(item.id));
                     
                     // Split item name (e.g., "AK-47 | Fire Serpent" -> ["AK-47", "Fire Serpent"])
                     const itemName = item.title || item.name || 'Unknown Item';
@@ -1545,254 +1558,26 @@ export function PlayerProfile({ isPrivate, playerName, onBack }: PlayerProfilePr
         </div>
       </div>
 
-      {/* Claim Notifications - Bottom Right */}
-      <div className="fixed bottom-6 right-6 z-50 space-y-3 w-80">
-        <AnimatePresence>
-          {claimRequests.map((request) => {
-            const isMinimized = minimizedRequests.has(request.id);
-            
-            // 🎨 Определяем цвет в зависимости от статуса
-            const getStatusColor = () => {
-              switch (request.status) {
-                case 'pending': return '#f59e0b'; // 🟡 Желтый/Оранжевый
-                case 'approved': return '#10b981'; // 🟢 Зеленый
-                case 'denied': return '#ef4444'; // 🔴 Красный
-                default: return '#f59e0b';
+      {/* 🎨 NEW REQUEST NOTIFICATIONS SYSTEM */}
+      <RequestNotifications
+        requests={claimRequests}
+        onClose={handleRemoveRequest}
+        onUpdateTime={handleUpdateRequestTime}
+        requestTimeoutMinutes={
+          (() => {
+            try {
+              const settings = localStorage.getItem('siteSettings');
+              if (settings) {
+                const parsed = JSON.parse(settings);
+                return parsed.requestTimeoutMinutes || 5;
               }
-            };
-            
-            const getStatusText = () => {
-              switch (request.status) {
-                case 'pending': return 'ОЖИДАНИЕ';
-                case 'approved': return 'ОДОБРЕНО';
-                case 'denied': return 'ОТКЛОНЕНО';
-                default: return 'ОЖИДАНИЕ';
-              }
-            };
-            
-            const getStatusIcon = () => {
-              switch (request.status) {
-                case 'pending': return <Clock className="w-5 h-5" />;
-                case 'approved': return <CheckCircle className="w-5 h-5" />;
-                case 'denied': return <CircleX className="w-5 h-5" />;
-                default: return <Clock className="w-5 h-5" />;
-              }
-            };
-            
-            const statusColor = getStatusColor();
-            
-            return (
-              <motion.div
-                key={request.id}
-                initial={{ x: 400, opacity: 0 }}
-                animate={{ 
-                  x: 0, 
-                  opacity: 1,
-                  width: isMinimized ? '220px' : '340px',
-                }}
-                exit={{ x: 400, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className="relative rounded-xl shadow-2xl overflow-hidden"
-                style={{
-                  backgroundColor: '#1a1f26',
-                }}
-              >
-                {/* 🔥 БЕГУЩАЯ ОБВОДКА (Animated Border) */}
-                <div className="absolute inset-0 rounded-xl overflow-hidden pointer-events-none">
-                  <svg className="absolute inset-0 w-full h-full">
-                    <defs>
-                      <linearGradient id={`border-gradient-${request.id}`} x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" style={{ stopColor: statusColor, stopOpacity: 1 }} />
-                        <stop offset="50%" style={{ stopColor: statusColor, stopOpacity: 0.3 }} />
-                        <stop offset="100%" style={{ stopColor: statusColor, stopOpacity: 1 }} />
-                      </linearGradient>
-                    </defs>
-                    <motion.rect
-                      x="1"
-                      y="1"
-                      width="calc(100% - 2px)"
-                      height="calc(100% - 2px)"
-                      rx="12"
-                      fill="none"
-                      stroke={`url(#border-gradient-${request.id})`}
-                      strokeWidth="3"
-                      strokeDasharray={request.status === 'pending' ? "20 10" : "0"}
-                      animate={request.status === 'pending' ? {
-                        strokeDashoffset: [0, -300],
-                      } : {}}
-                      transition={{
-                        duration: 3,
-                        repeat: request.status === 'pending' ? Infinity : 0,
-                        ease: 'linear',
-                      }}
-                      style={{
-                        filter: `drop-shadow(0 0 8px ${statusColor}66)`,
-                      }}
-                    />
-                  </svg>
-                </div>
-
-                {isMinimized ? (
-                  // Minimized View (Tab)
-                  <div 
-                    onClick={() => handleToggleMinimize(request.id)}
-                    className="relative p-3 flex items-center justify-between gap-2 hover:bg-white/5 transition-colors cursor-pointer"
-                  >
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      {request.status === 'pending' ? (
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                          className="w-4 h-4 rounded-full flex-shrink-0"
-                          style={{
-                            border: `2px solid ${statusColor}30`,
-                            borderTopColor: statusColor,
-                          }}
-                        />
-                      ) : request.status === 'approved' ? (
-                        <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: statusColor }} />
-                      ) : (
-                        <CircleX className="w-4 h-4 flex-shrink-0" style={{ color: statusColor }} />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-bold font-[Aldrich] truncate" style={{ color: statusColor }}>
-                          {getStatusText()}
-                        </div>
-                        {request.status === 'pending' && (
-                          <div className="text-xs text-gray-400 truncate">
-                            {formatTimeRemaining(request.timeRemaining)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <Maximize2 className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                  </div>
-                ) : (
-                  // Expanded View
-                  <div className="relative p-4">
-                    {/* Countdown Timer (только для pending) */}
-                    {request.status === 'pending' && (
-                      <CountdownTimer
-                        request={request}
-                        onUpdate={(id, timeRemaining) => {
-                          setClaimRequests(prev => prev.map(req => req.id === id ? { ...req, timeRemaining } : req));
-                        }}
-                        onTimeout={(id) => {
-                          // 🔥 Таймер истёк - автоматическая отмена заявки
-                          console.log(`⏱ [PlayerProfile] Request ${id} timed out, cancelling...`);
-                          handleRemoveRequest(id);
-                          clearProcessingId();
-                          toast.error(
-                            <div className="flex items-center gap-3">
-                              <CircleX className="w-5 h-5 flex-shrink-0 text-[#ef4444]" />
-                              <span>Request cancelled: Admin did not respond in 60 minutes</span>
-                            </div>,
-                            { duration: 6000 }
-                          );
-                        }}
-                      />
-                    )}
-                    
-                    {/* Action Button - ТОЛЬКО МИНИМИЗАЦИЯ (без крестика) */}
-                    <div className="absolute top-2 right-2 z-10">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleToggleMinimize(request.id);
-                        }}
-                        className="w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-                      >
-                        <Minimize2 className="w-3 h-3" />
-                      </button>
-                    </div>
-
-                    {/* Header */}
-                    <div className="flex items-center gap-2 mb-3">
-                      <div style={{ color: statusColor }}>
-                        {getStatusIcon()}
-                      </div>
-                      <h3 className="font-bold text-sm font-[Aldrich]" style={{ color: statusColor }}>
-                        СТАТУС ЗАЯВКИ
-                      </h3>
-                    </div>
-
-                    {/* Request ID */}
-                    <div className="mb-3 bg-black/40 rounded-lg p-2">
-                      <div className="text-xs text-gray-400 mb-1">ID Заявки:</div>
-                      <div className="font-bold text-sm font-mono" style={{ color: statusColor }}>
-                        #{request.requestId}
-                      </div>
-                    </div>
-
-                    {/* Item Info */}
-                    <div className="mb-3">
-                      <div className="text-xs text-gray-400 mb-1">Предмет:</div>
-                      <div className="font-bold text-sm truncate">{request.itemName}</div>
-                      <div 
-                        className="text-xs font-bold uppercase mt-1"
-                        style={{ color: rarityColors[request.itemRarity] }}
-                      >
-                        {request.itemRarity}
-                      </div>
-                    </div>
-
-                    {/* Status Display */}
-                    <div 
-                      className="flex items-center gap-3 p-3 rounded-lg border mb-3"
-                      style={{
-                        backgroundColor: `${statusColor}10`,
-                        borderColor: `${statusColor}30`,
-                      }}
-                    >
-                      {request.status === 'pending' ? (
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                          className="w-5 h-5 rounded-full flex-shrink-0"
-                          style={{
-                            border: `2px solid ${statusColor}30`,
-                            borderTopColor: statusColor,
-                          }}
-                        />
-                      ) : request.status === 'approved' ? (
-                        <CheckCircle className="w-5 h-5 flex-shrink-0" style={{ color: statusColor }} />
-                      ) : (
-                        <CircleX className="w-5 h-5 flex-shrink-0" style={{ color: statusColor }} />
-                      )}
-                      <div className="flex-1">
-                        <div className="text-xs text-gray-400">Статус:</div>
-                        <div className="font-bold text-sm font-[Aldrich]" style={{ color: statusColor }}>
-                          {request.status === 'pending' && 'Ожидание подтверждения администратора'}
-                          {request.status === 'approved' && 'Заявка одобрена! Предмет отправлен.'}
-                          {request.status === 'denied' && 'Заявка отклонена администратором.'}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Countdown Display (только для pending) */}
-                    {request.status === 'pending' && (
-                      <div className="flex items-center justify-between p-2 bg-black/40 rounded-lg mb-2">
-                        <div className="text-xs text-gray-400">Осталось времени:</div>
-                        <div className="font-bold font-mono text-lg" style={{ color: statusColor }}>
-                          {formatTimeRemaining(request.timeRemaining)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Timestamp */}
-                    <div className="text-xs text-gray-500">
-                      Создано: {request.timestamp.toLocaleTimeString()}
-                    </div>
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-      </div>
-
-      {/* Levels Modal */}
-      {showLevelsModal && (
+            } catch (e) {
+              console.error('Error reading requestTimeoutMinutes:', e);
+            }
+            return 5; // По умолчанию 5 минут
+          })()
+        }
+      />\n\n      {/* Levels Modal */}\n      {showLevelsModal && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, AlertTriangle, Check, X, Eye } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle, X, Eye } from 'lucide-react';
 import { useAdminLanguage } from '../contexts/AdminLanguageContext';
 import { UserRole } from '../AdminApp';
 import { toast } from 'sonner';
+import { getAdminAuthHeaders } from '../utils/adminAuth';
 
 interface Problem {
   id: string;
@@ -39,12 +40,9 @@ export function ProblemQueuePage({ userRole }: ProblemQueuePageProps) {
   const fetchProblems = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('session_token');
       
       const response = await fetch('/api/admin/problems', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAdminAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -109,13 +107,11 @@ export function ProblemQueuePage({ userRole }: ProblemQueuePageProps) {
 
   const handleResolve = async (id: string) => {
     try {
-      const token = localStorage.getItem('session_token');
       
       const response = await fetch(`/api/admin/problems/${id}/resolve`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAdminAuthHeaders(),
+        body: JSON.stringify({ resolution: 'Resolved' }),
       });
 
       if (!response.ok) {
@@ -132,13 +128,10 @@ export function ProblemQueuePage({ userRole }: ProblemQueuePageProps) {
 
   const handleClose = async (id: string) => {
     try {
-      const token = localStorage.getItem('session_token');
       
       const response = await fetch(`/api/admin/problems/${id}/close`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        headers: getAdminAuthHeaders(),
       });
 
       if (!response.ok) {
@@ -285,7 +278,7 @@ export function ProblemQueuePage({ userRole }: ProblemQueuePageProps) {
                                 className="p-2 rounded-lg bg-green-500/20 hover:bg-green-500/30 text-green-500 transition-colors"
                                 title="Resolve"
                               >
-                                <Check className="w-4 h-4" />
+                                <CheckCircle className="w-4 h-4" />
                               </button>
                             )}
                             {problem.status === 'resolved' && (

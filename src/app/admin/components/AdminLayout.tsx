@@ -1,26 +1,49 @@
-import { ReactNode, useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  LayoutDashboard, 
-  Package, 
-  Box, 
-  FileText, 
-  AlertTriangle, 
-  Users, 
-  FileSearch, 
+import {
+  LayoutDashboard,
+  Package,
+  Gift,
+  Users,
   Settings,
+  LogOut,
+  Menu,
+  X,
+  FileText,
+  ChevronRight,
+  AlertCircle,
+  Lock,
+  Eye,
+  EyeOff,
+  Languages,
   Search,
   Bell,
   User,
-  LogOut,
-  ChevronLeft,
-  Globe,
-  Lock,
-  X,
-  Save
+  Save,
 } from 'lucide-react';
-import { AdminPage, AdminUser } from '../AdminApp';
-import { useAdminLanguage, AdminLanguage } from '../contexts/AdminLanguageContext';
+import { useAdminLanguage } from '../contexts/AdminLanguageContext';
+import { getAdminAuthHeaders } from '../utils/adminAuth';
+
+// Импортируем типы из AdminApp
+type AdminPage = 
+  | 'login'
+  | 'dashboard'
+  | 'items'
+  | 'cases'
+  | 'requests'
+  | 'problem-queue'
+  | 'users'
+  | 'logs'
+  | 'settings';
+
+type AdminLanguage = 'en' | 'ru' | 'lv';
+
+interface AdminUser {
+  id: string;
+  username: string;
+  role: 'owner' | 'admin' | 'moderator';
+  email: string;
+}
 
 interface AdminLayoutProps {
   children: ReactNode;
@@ -60,11 +83,8 @@ export function AdminLayout({
   useEffect(() => {
     const fetchPendingRequests = async () => {
       try {
-        const token = localStorage.getItem('session_token');
         const response = await fetch('/api/admin/requests?status=pending', {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          },
+          headers: getAdminAuthHeaders(),
         });
         
         if (response.ok) {
@@ -73,7 +93,6 @@ export function AdminLayout({
         }
       } catch (error) {
         console.error('Error fetching pending requests:', error);
-        // Не показываем ошибку пользователю, просто оставляем 0
       }
     };
 
@@ -95,11 +114,10 @@ export function AdminLayout({
   const menuItems: MenuItem[] = [
     { id: 'dashboard' as AdminPage, label: t('sidebar.dashboard'), icon: LayoutDashboard },
     { id: 'items' as AdminPage, label: t('sidebar.items'), icon: Package },
-    { id: 'cases' as AdminPage, label: t('sidebar.cases'), icon: Box },
+    { id: 'cases' as AdminPage, label: t('sidebar.cases'), icon: Gift },
     { id: 'requests' as AdminPage, label: t('sidebar.requests'), icon: FileText, badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined },
-    { id: 'problem-queue' as AdminPage, label: t('sidebar.problemQueue'), icon: AlertTriangle },
+    { id: 'problem-queue' as AdminPage, label: t('sidebar.problemQueue'), icon: AlertCircle },
     { id: 'users' as AdminPage, label: t('sidebar.users'), icon: Users, ownerOnly: true },
-    { id: 'logs' as AdminPage, label: t('sidebar.logs'), icon: FileSearch },
     { id: 'settings' as AdminPage, label: t('sidebar.settings'), icon: Settings, ownerOnly: true },
   ];
 
@@ -139,7 +157,7 @@ export function AdminLayout({
             className="w-8 h-8 rounded-lg flex items-center justify-center transition-colors"
             style={{ background: '#25252a' }}
           >
-            <ChevronLeft 
+            <ChevronRight 
               className="w-5 h-5 text-white transition-transform" 
               style={{ transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0)' }}
             />
@@ -232,7 +250,7 @@ export function AdminLayout({
                 onMouseEnter={(e) => e.currentTarget.style.background = '#2d2d32'}
                 onMouseLeave={(e) => e.currentTarget.style.background = '#25252a'}
               >
-                <Globe className="w-5 h-5 text-gray-300" />
+                <Languages className="w-5 h-5 text-gray-300" />
               </button>
 
               <AnimatePresence>
@@ -373,7 +391,7 @@ export function AdminLayout({
                               className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
                               style={{ background: '#ef444420' }}
                             >
-                              <AlertTriangle className="w-5 h-5" style={{ color: '#ef4444' }} />
+                              <AlertCircle className="w-5 h-5" style={{ color: '#ef4444' }} />
                             </div>
                             <div className="flex-1">
                               <p className="text-sm font-medium text-white">

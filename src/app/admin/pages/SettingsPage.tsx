@@ -34,6 +34,7 @@ export function SettingsPage({ userRole }: SettingsPageProps) {
     // General
     lowStockThreshold: 10,
     expireTtl: 48,
+    requestTimeoutMinutes: 5, // 🔥 НОВОЕ: время ответа на заявки в минутах (owner only)
     rarities: {
       common: { color: '#9ca3af', chance: 50 },
       rare: { color: '#3b82f6', chance: 30 },
@@ -355,6 +356,27 @@ export function SettingsPage({ userRole }: SettingsPageProps) {
               />
               <p className="text-xs text-gray-500 mt-1">Hours before unclaimed prize expires</p>
             </div>
+
+            {/* Request Timeout Minutes */}
+            {userRole === 'owner' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  {t('settings.requestTimeoutMinutes')}
+                </label>
+                <input
+                  type="number"
+                  value={settings.requestTimeoutMinutes}
+                  onChange={(e) => setSettings({ ...settings, requestTimeoutMinutes: parseInt(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 rounded-lg outline-none"
+                  style={{
+                    background: '#25252a',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    color: '#ffffff',
+                  }}
+                />
+                <p className="text-xs text-gray-500 mt-1">Minutes before request times out</p>
+              </div>
+            )}
           </div>
         </div>
 
